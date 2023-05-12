@@ -86,24 +86,24 @@ class sfp_binaryedge(SpiderFootPlugin):
 
     def query(self, qry, querytype, page=1):
         ret = None
-        retarr = list()
+        retarr = []
 
         if self.errorState:
             return None
 
         if querytype == "email":
             queryurl = "/v2/query/dataleaks/email/{0}?page={1}"
-        if querytype == "ports":
-            queryurl = "/v2/query/ip/{0}?page={1}"
-        if querytype == "torrent":
-            queryurl = "/v2/query/torrent/historical/{0}?page={1}"
-        if querytype == "vuln":
-            queryurl = "/v2/query/cve/ip/{0}?page={1}"
-        if querytype == "subs":
-            queryurl = "/v2/query/domains/subdomain/{0}?page={1}"
-        if querytype == "passive":
+        elif querytype == "passive":
             queryurl = "/v2/query/domains/ip/{0}?page={1}"
 
+        elif querytype == "ports":
+            queryurl = "/v2/query/ip/{0}?page={1}"
+        elif querytype == "subs":
+            queryurl = "/v2/query/domains/subdomain/{0}?page={1}"
+        elif querytype == "torrent":
+            queryurl = "/v2/query/torrent/historical/{0}?page={1}"
+        elif querytype == "vuln":
+            queryurl = "/v2/query/cve/ip/{0}?page={1}"
         binaryedgeurl = "https://api.binaryedge.io"
         headers = {
             'X-Key': self.opts['binaryedge_api_key']
@@ -118,11 +118,11 @@ class sfp_binaryedge(SpiderFootPlugin):
             return None
 
         if res['content'] is None:
-            self.sf.info("No BinaryEdge.io info found for " + qry)
+            self.sf.info(f"No BinaryEdge.io info found for {qry}")
             return None
 
         if len(res['content']) == 0:
-            self.sf.info("No BinaryEdge.io info found for " + qry)
+            self.sf.info(f"No BinaryEdge.io info found for {qry}")
             return None
 
         try:
@@ -137,8 +137,7 @@ class sfp_binaryedge(SpiderFootPlugin):
                 self.sf.error("Maximum number of pages reached.", False)
                 return [info]
             retarr.append(info)
-            e = self.query(qry, querytype, page)
-            if e:
+            if e := self.query(qry, querytype, page):
                 retarr.extend(e)
         else:
             retarr.append(info)

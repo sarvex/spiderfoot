@@ -60,10 +60,12 @@ class sfp_apility(SpiderFootPlugin):
             'Accept': 'application/json',
             'X-Auth-Token': self.opts['api_key']
         }
-        res = self.sf.fetchUrl('https://api.apility.net/baddomain/' + qry,
-                               headers=headers,
-                               timeout=15,
-                               useragent=self.opts['_useragent'])
+        res = self.sf.fetchUrl(
+            f'https://api.apility.net/baddomain/{qry}',
+            headers=headers,
+            timeout=15,
+            useragent=self.opts['_useragent'],
+        )
 
         time.sleep(self.opts['delay'])
 
@@ -76,10 +78,12 @@ class sfp_apility(SpiderFootPlugin):
             'Accept': 'application/json',
             'X-Auth-Token': self.opts['api_key']
         }
-        res = self.sf.fetchUrl('https://api.apility.net/badip/' + qry,
-                               headers=headers,
-                               timeout=15,
-                               useragent=self.opts['_useragent'])
+        res = self.sf.fetchUrl(
+            f'https://api.apility.net/badip/{qry}',
+            headers=headers,
+            timeout=15,
+            useragent=self.opts['_useragent'],
+        )
 
         time.sleep(self.opts['delay'])
 
@@ -94,10 +98,12 @@ class sfp_apility(SpiderFootPlugin):
             'Accept': 'application/json',
             'X-Auth-Token': self.opts['api_key']
         }
-        res = self.sf.fetchUrl('https://api.apility.net/v2.0/ip/' + qry,
-                               headers=headers,
-                               timeout=15,
-                               useragent=self.opts['_useragent'])
+        res = self.sf.fetchUrl(
+            f'https://api.apility.net/v2.0/ip/{qry}',
+            headers=headers,
+            timeout=15,
+            useragent=self.opts['_useragent'],
+        )
 
         time.sleep(self.opts['delay'])
 
@@ -111,10 +117,12 @@ class sfp_apility(SpiderFootPlugin):
             'Accept': 'application/json',
             'X-Auth-Token': self.opts['api_key']
         }
-        res = self.sf.fetchUrl('https://api.apility.net/v2.0/as/ip/' + qry,
-                               headers=headers,
-                               timeout=15,
-                               useragent=self.opts['_useragent'])
+        res = self.sf.fetchUrl(
+            f'https://api.apility.net/v2.0/as/ip/{qry}',
+            headers=headers,
+            timeout=15,
+            useragent=self.opts['_useragent'],
+        )
 
         time.sleep(self.opts['delay'])
 
@@ -167,13 +175,13 @@ class sfp_apility(SpiderFootPlugin):
 
         self.results[eventData] = True
 
-        self.sf.debug("Received event, " + eventName + ", from " + srcModuleName)
+        self.sf.debug(f"Received event, {eventName}, from {srcModuleName}")
 
         if eventName == 'IP_ADDRESS':
             data = self.queryBadIp(eventData)
 
             if data is None:
-                self.sf.debug("No matches found for " + eventData)
+                self.sf.debug(f"No matches found for {eventData}")
                 return None
 
             res = data.get('response')

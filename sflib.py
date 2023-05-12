@@ -89,7 +89,7 @@ class SpiderFoot:
                 controller.signal(Signal.NEWNYM)
                 time.sleep(10)
         except BaseException as e:
-            self.fatal("Unable to re-circuit TOR: " + str(e))
+            self.fatal(f"Unable to re-circuit TOR: {str(e)}")
 
     # Supplied an option value, return the data based on what the
     # value is. If val is a URL, you'll get back the fetched content,
@@ -103,37 +103,30 @@ class SpiderFoot:
         if val.startswith('@'):
             fname = val.split('@')[1]
             try:
-                self.info("Loading configuration data from: " + fname)
-                f = open(fname, "r")
+                self.info(f"Loading configuration data from: {fname}")
+                with open(fname, "r") as f:
+                    if splitLines:
+                        arr = f.readlines()
+                        ret = [x.rstrip('\n') for x in arr]
+                    else:
+                        ret = f.read()
 
-                if splitLines:
-                    arr = f.readlines()
-                    ret = list()
-                    for x in arr:
-                        ret.append(x.rstrip('\n'))
-                else:
-                    ret = f.read()
-
-                f.close()
                 return ret
             except BaseException as b:
                 if fatal:
-                    self.error("Unable to open option file, " + fname + ".")
+                    self.error(f"Unable to open option file, {fname}.")
                 else:
                     return None
 
         if val.lower().startswith('http://') or val.lower().startswith('https://'):
             try:
-                self.info("Downloading configuration data from: " + val)
+                self.info(f"Downloading configuration data from: {val}")
                 session = self.getSession()
                 res = session.get(val)
-                if splitLines:
-                    return res.content.splitlines()
-                else:
-                    return res.content
+                return res.content.splitlines() if splitLines else res.content
             except BaseException as e:
                 if fatal:
-                    self.error("Unable to open option URL, " + val + ": " + str(e))
+                    self.error(f"Unable to open option URL, {val}: {str(e)}")
                 else:
                     return None
 
@@ -143,8 +136,8 @@ class SpiderFoot:
     # basis for building graphs in various formats.
     def buildGraphData(self, data, flt=list()):
         mapping = set()
-        entities = dict()
-        parents = dict()
+        entities = {}
+        parents = {}
 
         def get_next_parent_entities(item, pids):
             ret = list()
@@ -161,7 +154,7 @@ class SpiderFoot:
             return ret
 
         for row in data:
-            if row[11] == "ENTITY" or row[11] == "INTERNAL":
+            if row[11] in ["ENTITY", "INTERNAL"]:
                 # List of all valid entity values
                 if len(flt) > 0:
                     if row[4] in flt or row[11] == "INTERNAL":
@@ -198,7 +191,7 @@ class SpiderFoot:
         mapping = self.buildGraphData(data, flt)
         graph = nx.Graph()
 
-        nodelist = dict()
+        nodelist = {}
         ncounter = 0
         for pair in mapping:
             (dst, src) = pair
@@ -232,11 +225,8 @@ class SpiderFoot:
     # Convert supplied raw data into JSON format for SigmaJS
     def buildGraphJson(self, root, data, flt=list()):
         mapping = self.buildGraphData(data, flt)
-        ret = dict()
-        ret['nodes'] = list()
-        ret['edges'] = list()
-
-        nodelist = dict()
+        ret = {'nodes': list(), 'edges': list()}
+        nodelist = {}
         ecounter = 0
         ncounter = 0
         for pair in mapping:
@@ -309,20 +299,20 @@ class SpiderFoot:
             return None
 
         if self.dbh is None:
-            print('[Error] %s' % message)
+            print(f'[Error] {message}')
         else:
             self._dblog("ERROR", message)
         if self.opts.get('__logstdout'):
-            print("[Error] %s" % message)
+            print(f"[Error] {message}")
         if exception:
-            raise BaseException("Internal Error Encountered: " + message)
+            raise BaseException(f"Internal Error Encountered: {message}")
 
     def fatal(self, error):
         if self.dbh is None:
-            print('[Fatal] %s' % error)
+            print(f'[Fatal] {error}')
         else:
             self._dblog("FATAL", error)
-        print(str(inspect.stack()))
+        print(inspect.stack())
         sys.exit(-1)
 
     def status(self, message):
@@ -330,11 +320,11 @@ class SpiderFoot:
             return None
 
         if self.dbh is None:
-            print("[Status] %s" % message)
+            print(f"[Status] {message}")
         else:
             self._dblog("STATUS", message)
         if self.opts.get('__logstdout'):
-            print("[*] %s" % message)
+            print(f"[*] {message}")
 
     def info(self, message):
         if not self.opts['__logging']:
@@ -345,23 +335,19 @@ class SpiderFoot:
 
         if mod is None:
             modName = "Unknown"
+        elif mod.__name__ == "sflib":
+            frm = inspect.stack()[2]
+            mod = inspect.getmodule(frm[0])
+            modName = "Unknown" if mod is None else mod.__name__
         else:
-            if mod.__name__ == "sflib":
-                frm = inspect.stack()[2]
-                mod = inspect.getmodule(frm[0])
-                if mod is None:
-                    modName = "Unknown"
-                else:
-                    modName = mod.__name__
-            else:
-                modName = mod.__name__
+            modName = mod.__name__
 
         if self.dbh is None:
-            print('[%s] %s' % (modName, message))
+            print(f'[{modName}] {message}')
         else:
             self._dblog("INFO", message, modName)
         if self.opts.get('__logstdout'):
-            print("[*] %s" % message)
+            print(f"[*] {message}")
         return
 
     def debug(self, message):
@@ -374,23 +360,19 @@ class SpiderFoot:
 
         if mod is None:
             modName = "Unknown"
+        elif mod.__name__ == "sflib":
+            frm = inspect.stack()[2]
+            mod = inspect.getmodule(frm[0])
+            modName = "Unknown" if mod is None else mod.__name__
         else:
-            if mod.__name__ == "sflib":
-                frm = inspect.stack()[2]
-                mod = inspect.getmodule(frm[0])
-                if mod is None:
-                    modName = "Unknown"
-                else:
-                    modName = mod.__name__
-            else:
-                modName = mod.__name__
+            modName = mod.__name__
 
         if self.dbh is None:
-            print('[%s] %s' % (modName, message))
+            print(f'[{modName}] {message}')
         else:
             self._dblog("DEBUG", message, modName)
         if self.opts.get('__logstdout'):
-            print("[d:%s] %s" % (modName, message))
+            print(f"[d:{modName}] {message}")
         return
 
     def myPath(self):
@@ -414,7 +396,7 @@ class SpiderFoot:
 
     # Return the cache path
     def cachePath(self):
-        path = self.myPath() + '/cache'
+        path = f'{self.myPath()}/cache'
         if not os.path.isdir(path):
             os.mkdir(path)
         return path
@@ -422,37 +404,35 @@ class SpiderFoot:
     # Store data to the cache
     def cachePut(self, label, data):
         pathLabel = hashlib.sha224(label.encode('utf-8')).hexdigest()
-        cacheFile = self.cachePath() + "/" + pathLabel
-        fp = open(cacheFile, "w")
-        if type(data) is list:
-            for line in data:
-                if type(line) is str:
-                    fp.write(line)
-                    fp.write("\n")
-                else:
-                    fp.write(line.decode('utf-8') + '\n')
-        elif type(data) is bytes:
-            fp.write(data.decode('utf-8'))
-        else:
-            fp.write(data)
-        fp.close()
+        cacheFile = f"{self.cachePath()}/{pathLabel}"
+        with open(cacheFile, "w") as fp:
+            if type(data) is list:
+                for line in data:
+                    if type(line) is str:
+                        fp.write(line)
+                        fp.write("\n")
+                    else:
+                        fp.write(line.decode('utf-8') + '\n')
+            elif type(data) is bytes:
+                fp.write(data.decode('utf-8'))
+            else:
+                fp.write(data)
 
     # Retreive data from the cache
     def cacheGet(self, label, timeoutHrs):
         pathLabel = hashlib.sha224(label.encode('utf-8')).hexdigest()
-        cacheFile = self.cachePath() + "/" + pathLabel
+        cacheFile = f"{self.cachePath()}/{pathLabel}"
         try:
             (m, i, d, n, u, g, sz, atime, mtime, ctime) = os.stat(cacheFile)
 
             if sz == 0:
                 return None
 
-            if mtime > time.time() - timeoutHrs * 3600 or timeoutHrs == 0:
-                with open(cacheFile, "r") as fp:
-                    fileContents = fp.read()
-                return fileContents
-            else:
+            if mtime <= time.time() - timeoutHrs * 3600 and timeoutHrs != 0:
                 return None
+            with open(cacheFile, "r") as fp:
+                fileContents = fp.read()
+            return fileContents
         except BaseException as e:
             return None
 
@@ -463,7 +443,7 @@ class SpiderFoot:
     # Convert a Python dictionary to something storable
     # in the database.
     def configSerialize(self, opts, filterSystem=True):
-        storeopts = dict()
+        storeopts = {}
 
         for opt in list(opts.keys()):
             # Filter out system temporary variables like GUID and others
@@ -474,10 +454,7 @@ class SpiderFoot:
                 storeopts[opt] = opts[opt]
 
             if type(opts[opt]) is bool:
-                if opts[opt]:
-                    storeopts[opt] = 1
-                else:
-                    storeopts[opt] = 0
+                storeopts[opt] = 1 if opts[opt] else 0
             if type(opts[opt]) is list:
                 storeopts[opt] = ','.join(opts[opt])
 
@@ -490,17 +467,15 @@ class SpiderFoot:
                     continue
 
                 if type(opts['__modules__'][mod]['opts'][opt]) is int or \
-                                type(opts['__modules__'][mod]['opts'][opt]) is str:
-                    storeopts[mod + ":" + opt] = opts['__modules__'][mod]['opts'][opt]
+                                    type(opts['__modules__'][mod]['opts'][opt]) is str:
+                    storeopts[f"{mod}:{opt}"] = opts['__modules__'][mod]['opts'][opt]
 
                 if type(opts['__modules__'][mod]['opts'][opt]) is bool:
-                    if opts['__modules__'][mod]['opts'][opt]:
-                        storeopts[mod + ":" + opt] = 1
-                    else:
-                        storeopts[mod + ":" + opt] = 0
+                    storeopts[f"{mod}:{opt}"] = 1 if opts['__modules__'][mod]['opts'][opt] else 0
                 if type(opts['__modules__'][mod]['opts'][opt]) is list:
-                    storeopts[mod + ":" + opt] = ','.join(str(x) \
-                                                          for x in opts['__modules__'][mod]['opts'][opt])
+                    storeopts[f"{mod}:{opt}"] = ','.join(
+                        str(x) for x in opts['__modules__'][mod]['opts'][opt]
+                    )
 
         return storeopts
 
@@ -518,11 +493,7 @@ class SpiderFoot:
                 continue
             if opt in opts:
                 if type(referencePoint[opt]) is bool:
-                    if opts[opt] == "1":
-                        returnOpts[opt] = True
-                    else:
-                        returnOpts[opt] = False
-
+                    returnOpts[opt] = opts[opt] == "1"
                 if type(referencePoint[opt]) is str:
                     returnOpts[opt] = str(opts[opt])
 
@@ -531,7 +502,7 @@ class SpiderFoot:
 
                 if type(referencePoint[opt]) is list:
                     if type(referencePoint[opt][0]) is int:
-                        returnOpts[opt] = list()
+                        returnOpts[opt] = []
                         for x in str(opts[opt]).split(","):
                             returnOpts[opt].append(int(x))
                     else:
@@ -546,29 +517,26 @@ class SpiderFoot:
             for opt in referencePoint['__modules__'][modName]['opts']:
                 if opt.startswith('_') and filterSystem:
                     continue
-                if modName + ":" + opt in opts:
+                if f"{modName}:{opt}" in opts:
                     if type(referencePoint['__modules__'][modName]['opts'][opt]) is bool:
-                        if opts[modName + ":" + opt] == "1":
-                            returnOpts['__modules__'][modName]['opts'][opt] = True
-                        else:
-                            returnOpts['__modules__'][modName]['opts'][opt] = False
-
+                        returnOpts['__modules__'][modName]['opts'][opt] = (
+                            opts[f"{modName}:{opt}"] == "1"
+                        )
                     if type(referencePoint['__modules__'][modName]['opts'][opt]) is str:
-                        returnOpts['__modules__'][modName]['opts'][opt] = \
-                            str(opts[modName + ":" + opt])
+                        returnOpts['__modules__'][modName]['opts'][opt] = str(opts[f"{modName}:{opt}"])
 
                     if type(referencePoint['__modules__'][modName]['opts'][opt]) is int:
-                        returnOpts['__modules__'][modName]['opts'][opt] = \
-                            int(opts[modName + ":" + opt])
+                        returnOpts['__modules__'][modName]['opts'][opt] = int(opts[f"{modName}:{opt}"])
 
                     if type(referencePoint['__modules__'][modName]['opts'][opt]) is list:
                         if type(referencePoint['__modules__'][modName]['opts'][opt][0]) is int:
-                            returnOpts['__modules__'][modName]['opts'][opt] = list()
-                            for x in str(opts[modName + ":" + opt]).split(","):
+                            returnOpts['__modules__'][modName]['opts'][opt] = []
+                            for x in str(opts[f"{modName}:{opt}"]).split(","):
                                 returnOpts['__modules__'][modName]['opts'][opt].append(int(x))
                         else:
-                            returnOpts['__modules__'][modName]['opts'][opt] = \
-                                str(opts[modName + ":" + opt]).split(",")
+                            returnOpts['__modules__'][modName]['opts'][opt] = str(
+                                opts[f"{modName}:{opt}"]
+                            ).split(",")
 
         return returnOpts
 
@@ -599,7 +567,7 @@ class SpiderFoot:
     # Return an array of module names for returning the
     # types specified.
     def modulesProducing(self, events):
-        modlist = list()
+        modlist = []
         for mod in list(self.opts['__modules__'].keys()):
             if self.opts['__modules__'][mod]['provides'] is None:
                 continue
@@ -615,7 +583,7 @@ class SpiderFoot:
     # Return an array of modules that consume the types
     # specified.
     def modulesConsuming(self, events):
-        modlist = list()
+        modlist = []
         for mod in list(self.opts['__modules__'].keys()):
             if self.opts['__modules__'][mod]['consumes'] is None:
                 continue
@@ -632,25 +600,25 @@ class SpiderFoot:
     # Return an array of types that are produced by the list
     # of modules supplied.
     def eventsFromModules(self, modules):
-        evtlist = list()
+        evtlist = []
         for mod in modules:
-            if mod in list(self.opts['__modules__'].keys()):
-                if self.opts['__modules__'][mod]['provides'] is not None:
-                    for evt in self.opts['__modules__'][mod]['provides']:
-                        evtlist.append(evt)
-
+            if (
+                mod in list(self.opts['__modules__'].keys())
+                and self.opts['__modules__'][mod]['provides'] is not None
+            ):
+                evtlist.extend(iter(self.opts['__modules__'][mod]['provides']))
         return evtlist
 
     # Return an array of types that are consumed by the list
     # of modules supplied.
     def eventsToModules(self, modules):
-        evtlist = list()
+        evtlist = []
         for mod in modules:
-            if mod in list(self.opts['__modules__'].keys()):
-                if self.opts['__modules__'][mod]['consumes'] is not None:
-                    for evt in self.opts['__modules__'][mod]['consumes']:
-                        evtlist.append(evt)
-
+            if (
+                mod in list(self.opts['__modules__'].keys())
+                and self.opts['__modules__'][mod]['consumes'] is not None
+            ):
+                evtlist.extend(iter(self.opts['__modules__'][mod]['consumes']))
         return evtlist
 
     #
@@ -659,7 +627,7 @@ class SpiderFoot:
 
     # Turn a relative path into an absolute path
     def urlRelativeToAbsolute(self, url):
-        finalBits = list()
+        finalBits = []
 
         if '..' not in url:
             return url
@@ -692,16 +660,16 @@ class SpiderFoot:
         # For cases like 'www.somesite.com'
         if len(bits) == 0:
             #self.debug('base dir of ' + url + ' not identified, using URL as base.')
-            return url + '/'
+            return f'{url}/'
 
         # For cases like 'http://www.blah.com'
         if '://' in url and url.count('/') < 3:
             #self.debug('base dir of ' + url + ' is: ' + url + '/')
-            return url + '/'
+            return f'{url}/'
 
         base = '/'.join(bits[:-1])
         #self.debug('base dir of ' + url + ' is: ' + base + '/')
-        return base + '/'
+        return f'{base}/'
 
     # Extract the scheme and domain from a URL
     # Does not return the trailing slash! So you can do .endswith()
@@ -712,20 +680,12 @@ class SpiderFoot:
         else:
             bits = re.match('(.[^/:\?]*)[:/\?]', url)
 
-        if bits is None:
-            return url.lower()
-
-        #self.debug('base url of ' + url + ' is: ' + bits.group(1))
-        return bits.group(1).lower()
+        return url.lower() if bits is None else bits[1].lower()
 
     # Extract the FQDN from a URL
     def urlFQDN(self, url):
         baseurl = self.urlBaseUrl(url)
-        if '://' not in baseurl:
-            count = 0
-        else:
-            count = 2
-
+        count = 0 if '://' not in baseurl else 2
         # http://abc.com will split to ['http:', '', 'abc.com']
         return baseurl.split('/')[count].lower()
 
@@ -734,22 +694,19 @@ class SpiderFoot:
     def domainKeyword(self, domain, tldList):
         # Strip off the TLD
         tld = '.'.join(self.hostDomain(domain.lower(), tldList).split('.')[1:])
-        ret = domain.lower().replace('.' + tld, '')
+        ret = domain.lower().replace(f'.{tld}', '')
 
         # If the user supplied a domain with a sub-domain, return the second part
-        if '.' in ret:
-            return ret.split('.')[-1]
-        else:
-            return ret
+        return ret.split('.')[-1] if '.' in ret else ret
 
     # Extract the keywords (the domains without the TLD or any subdomains)
     # from a list of domains.
     def domainKeywords(self, domainList, tldList):
-        arr = list()
+        arr = []
         for domain in domainList:
             # Strip off the TLD
             tld = '.'.join(self.hostDomain(domain.lower(), tldList).split('.')[1:])
-            ret = domain.lower().replace('.' + tld, '')
+            ret = domain.lower().replace(f'.{tld}', '')
 
             # If the user supplied a domain with a sub-domain, return the second part
             if '.' in ret:
@@ -757,7 +714,7 @@ class SpiderFoot:
             else:
                 arr.append(ret)
 
-        self.debug("Keywords: " + str(arr))
+        self.debug(f"Keywords: {arr}")
         return arr
 
     # Obtain the domain name for a supplied hostname
@@ -791,29 +748,22 @@ class SpiderFoot:
 
     # Simple way to verify IPv4 addresses.
     def validIP(self, address):
-        if not address:
-            return False
-        return netaddr.valid_ipv4(address)
+        return False if not address else netaddr.valid_ipv4(address)
 
     # Simple way to verify IPv6 addresses.
     def validIP6(self, address):
-        if not address:
-            return False
-        return netaddr.valid_ipv6(address)
+        return False if not address else netaddr.valid_ipv6(address)
 
     # Simple way to verify netblock.
     def validIpNetwork(self, cidr):
         try:
-            if '/' in str(cidr) and netaddr.IPNetwork(str(cidr)).size > 0:
-                return True
-            else:
-                return False
+            return '/' in str(cidr) and netaddr.IPNetwork(str(cidr)).size > 0
         except:
             return False
 
     # Clean DNS results to be a simple list
     def normalizeDNS(self, res):
-        ret = list()
+        ret = []
         for addr in res:
             if type(addr) == list:
                 for host in addr:
@@ -836,27 +786,20 @@ class SpiderFoot:
         if '..' in cmd:
             return False
 
-        if cmd.startswith("-"):
-            return False
-
-        if len(cmd) < 3:
-            return False
-
-        return True
+        return False if cmd.startswith("-") else len(cmd) >= 3
 
     # Return dictionary words and/or names
     def dictwords(self):
-        wd = dict()
+        wd = {}
 
         dicts = [ "english", "german", "french", "spanish" ]
 
         for d in dicts:
             try:
-                wdct = open(self.myPath() + "/dicts/ispell/" + d + ".dict", 'r')
-                dlines = wdct.readlines()
-                wdct.close()
+                with open(f"{self.myPath()}/dicts/ispell/{d}.dict", 'r') as wdct:
+                    dlines = wdct.readlines()
             except BaseException as e:
-                self.debug("Could not read dictionary: " + str(e))
+                self.debug(f"Could not read dictionary: {str(e)}")
                 continue
 
             for w in dlines:
@@ -867,17 +810,16 @@ class SpiderFoot:
 
     # Return dictionary names
     def dictnames(self):
-        wd = dict()
+        wd = {}
 
         dicts = [ "names" ]
 
         for d in dicts:
             try:
-                wdct = open(self.myPath() + "/dicts/ispell/" + d + ".dict", 'r')
-                dlines = wdct.readlines()
-                wdct.close()
+                with open(f"{self.myPath()}/dicts/ispell/{d}.dict", 'r') as wdct:
+                    dlines = wdct.readlines()
             except BaseException as e:
-                self.debug("Could not read dictionary: " + str(e))
+                self.debug(f"Could not read dictionary: {str(e)}")
                 continue
 
             for w in dlines:
@@ -892,7 +834,7 @@ class SpiderFoot:
     def dataParentChildToTree(self, data):
         def get_children(needle, haystack):
             #print("called")
-            ret = list()
+            ret = []
 
             if needle not in list(haystack.keys()):
                 return None
@@ -939,68 +881,55 @@ class SpiderFoot:
     def resolveHost(self, host):
         try:
             addrs = self.normalizeDNS(socket.gethostbyname_ex(host))
-            if len(addrs) > 0:
-                return list(set(addrs))
-            return None
+            return list(set(addrs)) if len(addrs) > 0 else None
         except BaseException as e:
-            self.debug("Unable to resolve " + str(host) + ": " + str(e))
+            self.debug(f"Unable to resolve {str(host)}: {str(e)}")
             return None
 
     # Return a normalised resolution of an IPv4 address or None if not resolved.
     def resolveIP(self, ipaddr):
-        self.debug("Performing reverse-resolve of " + ipaddr)
+        self.debug(f"Performing reverse-resolve of {ipaddr}")
 
         try:
             addrs = self.normalizeDNS(socket.gethostbyaddr(ipaddr))
-            if len(addrs) > 0:
-                return list(set(addrs))
-            return None
+            return list(set(addrs)) if len(addrs) > 0 else None
         except BaseException as e:
-            self.debug("Unable to resolve " + ipaddr + " (" + str(e) + ")")
+            self.debug(f"Unable to resolve {ipaddr} ({str(e)})")
             return None
 
     # Return a normalised resolution of an IPv6 address or None if not resolved.
     def resolveHost6(self, hostname):
         try:
-            addrs = list()
+            addrs = []
             res = socket.getaddrinfo(hostname, None, socket.AF_INET6)
             for addr in res:
                 if addr[4][0] not in addrs:
                     addrs.append(addr[4][0])
-            if len(addrs) < 1:
+            if not addrs:
                 return None
-            self.debug("Resolved " + hostname + " to IPv6: " + str(addrs))
+            self.debug(f"Resolved {hostname} to IPv6: {addrs}")
             return list(set(addrs))
         except BaseException as e:
-            self.debug("Unable to IPv6 resolve " + hostname + " (" + str(e) + ")")
+            self.debug(f"Unable to IPv6 resolve {hostname} ({str(e)})")
             return None
 
     # Verify a host resolves to a given IP
     def validateIP(self, host, ip):
         addrs = self.resolveHost(host)
 
-        if addrs is None:
-            return False
-
-        for addr in addrs:
-            if str(addr) == ip:
-                return True
-
-        return False
+        return False if addrs is None else any(str(addr) == ip for addr in addrs)
 
     # Resolve alternative names for a given target
     def resolveTargets(self, target, validateReverse):
-        ret = list()
+        ret = []
         t = target.getType()
         v = target.getValue()
 
         if t in [ "IP_ADDRESS", "IPV6_ADDRESS" ]:
-            r = self.resolveIP(v)
-            if r:
+            if r := self.resolveIP(v):
                 ret.extend(r)
         if t == "INTERNET_NAME":
-            r = self.resolveHost(v)
-            if r:
+            if r := self.resolveHost(v):
                 ret.extend(r)
         if t == "NETBLOCK_OWNER":
             for addr in netaddr.IPNetwork(v):
@@ -1011,20 +940,15 @@ class SpiderFoot:
                     continue
                 ret.append(ipaddr)
 
-                # Add the reverse-resolved hostnames as aliases too..
-                names = self.resolveIP(ipaddr)
-                if names:
+                if names := self.resolveIP(ipaddr):
                     if validateReverse:
                         for host in names:
-                            chk = self.resolveHost(host)
-                            if chk:
+                            if chk := self.resolveHost(host):
                                 if ipaddr in chk:
                                     ret.append(host)
                     else:
                         ret.extend(names)
-        if len(ret) > 0:
-            return list(set(ret))
-        return None
+        return list(set(ret)) if ret else None
 
     # Create a safe socket that's using SOCKS/TOR if it was enabled
     def safeSocket(self, host, port, timeout):
@@ -1044,15 +968,15 @@ class SpiderFoot:
     # Parse the contents of robots.txt, returns a list of patterns
     # which should not be followed
     def parseRobotsTxt(self, robotsTxtData):
-        returnArr = list()
+        returnArr = []
 
         # We don't check the User-Agent rule yet.. probably should at some stage
 
         for line in robotsTxtData.splitlines():
             if line.lower().startswith('disallow:'):
                 m = re.match('disallow:\s*(.[^ #]*)', line, re.IGNORECASE)
-                self.debug('robots.txt parsing found disallow: ' + m.group(1))
-                returnArr.append(m.group(1))
+                self.debug(f'robots.txt parsing found disallow: {m[1]}')
+                returnArr.append(m[1])
                 continue
 
         return returnArr
@@ -1064,7 +988,7 @@ class SpiderFoot:
         matches = re.findall(r'([\%a-zA-Z\.0-9_\-\+]+@[a-zA-Z\.0-9\-]+\.[a-zA-Z\.0-9\-]+)', data)
 
         for match in matches:
-            self.debug("Found possible email: " + match)
+            self.debug(f"Found possible email: {match}")
 
             # Handle false positive matches
             if len(match) < 5:
@@ -1073,12 +997,12 @@ class SpiderFoot:
 
             # Handle messed up encodings
             if "%" in match:
-                self.debug("Skipped invalid email address: " + match)
+                self.debug(f"Skipped invalid email address: {match}")
                 continue
 
             # Handle truncated emails
             if "..." in match:
-                self.debug("Skipped incomplete e-mail address: " + match)
+                self.debug(f"Skipped incomplete e-mail address: {match}")
                 continue
 
             emails.add(match)
@@ -1091,7 +1015,6 @@ class SpiderFoot:
 
     # Parse a PEM-format SSL certificate
     def parseCert(self, rawcert, fqdn=None, expiringdays=30):
-        ret = dict()
         if '\r' in rawcert:
             rawcert = rawcert.replace('\r', '')
         if type(rawcert) == str:
@@ -1102,9 +1025,9 @@ class SpiderFoot:
         sslcert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, rawcert)
         sslcert_dump = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_TEXT, sslcert)
 
-        ret['text'] = sslcert_dump.decode('utf-8', errors='replace')
+        ret = {'text': sslcert_dump.decode('utf-8', errors='replace')}
         ret['issuer'] = str(cert.issuer)
-        ret['altnames'] = list()
+        ret['altnames'] = []
         ret['expired'] = False
         ret['expiring'] = False
         ret['mismatch'] = False
@@ -1123,7 +1046,7 @@ class SpiderFoot:
             if ret['expiry'] <= now:
                 ret['expired'] = True
         except BaseException as e:
-            self.error("Error processing date in certificate: " + str(e) , False)
+            self.error(f"Error processing date in certificate: {str(e)}", False)
             ret['certerror'] = True
             return ret
 
@@ -1134,10 +1057,8 @@ class SpiderFoot:
                 if isinstance(x, cryptography.x509.DNSName):
                     ret['altnames'].append(x.value.lower().encode('raw_unicode_escape').decode("ascii", errors='replace'))
         except BaseException as e:
-            self.debug("Problem processing certificate: " + str(e))
-            pass
-
-        certhosts = list()
+            self.debug(f"Problem processing certificate: {str(e)}")
+        certhosts = []
         try:
             attrs = cert.subject.get_attributes_for_oid(cryptography.x509.oid.NameOID.COMMON_NAME)
 
@@ -1147,32 +1068,28 @@ class SpiderFoot:
                 if name not in ret['altnames']:
                     certhosts.append(name)
         except BaseException as e:
-            self.debug("Problem processing certificate: " + str(e))
-            pass
-
+            self.debug(f"Problem processing certificate: {str(e)}")
         # Check for mismatch
         if fqdn and ret['issued']:
             fqdn = fqdn.lower()
 
             try:
                 # Extract the CN from the issued section
-                if "cn=" + fqdn in ret['issued'].lower():
+                if f"cn={fqdn}" in ret['issued'].lower():
                     certhosts.append(fqdn)
 
                 # Extract subject alternative names
-                for host in ret['altnames']:
-                    certhosts.append(host.replace("dns:", ""))
-
+                certhosts.extend(host.replace("dns:", "") for host in ret['altnames'])
                 ret['hosts'] = certhosts
 
-                self.debug("Checking for " + fqdn + " in certificate subject")
+                self.debug(f"Checking for {fqdn} in certificate subject")
                 fqdn_tld = ".".join(fqdn.split(".")[1:]).lower()
 
                 found = False
                 for chost in certhosts:
                     if chost == fqdn:
                         found = True
-                    if chost == "*." + fqdn_tld:
+                    if chost == f"*.{fqdn_tld}":
                         found = True
                     if chost == fqdn_tld:
                         found = True
@@ -1180,7 +1097,7 @@ class SpiderFoot:
                 if not found:
                     ret['mismatch'] = True
             except BaseException as e:
-                self.error("Error processing certificate: " + str(e), False)
+                self.error(f"Error processing certificate: {str(e)}", False)
                 ret['certerror'] = True
 
         return ret

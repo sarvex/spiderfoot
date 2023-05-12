@@ -239,7 +239,7 @@ class SpiderFootDb:
         # connect() will create the database file if it doesn't exist, but
         # at least we can use this opportunity to ensure we have permissions to
         # read and write to such a file.
-        dbh = sqlite3.connect(self.sf.myPath() + "/" + opts['__database'], timeout=10)
+        dbh = sqlite3.connect(f"{self.sf.myPath()}/" + opts['__database'], timeout=10)
         if dbh is None:
             self.sf.fatal("Could not connect to internal database, and couldn't create " + opts['__database'])
         dbh.text_factory = str
@@ -258,7 +258,9 @@ class SpiderFootDb:
                 self.create()
                 init = True
             except BaseException as e:
-                self.sf.error("Tried to set up the SpiderFoot database schema, but failed: " + e.args[0])
+                self.sf.error(
+                    f"Tried to set up the SpiderFoot database schema, but failed: {e.args[0]}"
+                )
             return
 
         if init:
@@ -285,7 +287,9 @@ class SpiderFootDb:
                 self.dbh.execute(qry)
             self.conn.commit()
         except sqlite3.Error as e:
-            raise BaseException("SQL error encountered when setting up database: " + e.args[0])
+            raise BaseException(
+                f"SQL error encountered when setting up database: {e.args[0]}"
+            )
 
     # Close the database handle
     def close(self):
@@ -302,7 +306,7 @@ class SpiderFootDb:
         if list(criteria.values()).count(None) == 3:
             return False
 
-        qvars = list()
+        qvars = []
         qry = "SELECT ROUND(c.generated) AS generated, c.data, \
             s.data as 'source_data', \
             c.module, c.type, c.confidence, c.visibility, c.risk, c.hash, \
@@ -325,14 +329,10 @@ class SpiderFootDb:
 
         if criteria.get('value') is not None:
             qry += " AND (c.data LIKE ? OR s.data LIKE ?) "
-            qvars.append(criteria['value'])
-            qvars.append(criteria['value'])
-
+            qvars.extend((criteria['value'], criteria['value']))
         if criteria.get('regex') is not None:
             qry += " AND (c.data REGEXP ? OR s.data REGEXP ?) "
-            qvars.append(criteria['regex'])
-            qvars.append(criteria['regex'])
-
+            qvars.extend((criteria['regex'], criteria['regex']))
         qry += " ORDER BY c.data"
 
         try:
@@ -341,7 +341,9 @@ class SpiderFootDb:
             self.dbh.execute(qry, qvars)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when fetching search results: " + e.args[0])
+            self.sf.error(
+                f"SQL error encountered when fetching search results: {e.args[0]}"
+            )
 
     # Get event types
     def eventTypes(self):
@@ -350,7 +352,7 @@ class SpiderFootDb:
             self.dbh.execute(qry)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when retreiving event types:" + e.args[0])
+            self.sf.error(f"SQL error encountered when retreiving event types:{e.args[0]}")
 
     # Log an event to the database
     def scanLogEvent(self, instanceId, classification, message, component=None):
@@ -366,15 +368,8 @@ class SpiderFootDb:
             ))
             self.conn.commit()
         except sqlite3.Error as e:
-            if "locked" in e.args[0] or "thread" in e.args[0]:
-                # TODO: Do something smarter here to handle locked databases
-                #print("[warning] Couldn't log due to SQLite limitations. You can probably ignore this.")
-                #self.sf.fatal("Unable to log event in DB due to lock: " + e.args[0])
-                pass
-            else:
-                print("[warning] Couldn't log due to: " + str(e.args[0]))
-                #self.sf.fatal("Unable to log event in DB: " + e.args[0])
-
+            if "locked" not in e.args[0] and "thread" not in e.args[0]:
+                print(f"[warning] Couldn't log due to: {str(e.args[0])}")
         return True
 
     # Store a scan instance
@@ -388,13 +383,13 @@ class SpiderFootDb:
             ))
             self.conn.commit()
         except sqlite3.Error as e:
-            self.sf.fatal("Unable to create instance in DB: " + e.args[0])
+            self.sf.fatal(f"Unable to create instance in DB: {e.args[0]}")
 
         return True
 
     # Update the start time, end time or status (or all 3) of a scan instance
     def scanInstanceSet(self, instanceId, started=None, ended=None, status=None):
-        qvars = list()
+        qvars = []
         qry = "UPDATE tbl_scan_instance SET "
 
         if started is not None:
@@ -430,22 +425,12 @@ class SpiderFootDb:
             self.dbh.execute(qry, qvars)
             return self.dbh.fetchone()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when retreiving scan instance:" + e.args[0])
+            self.sf.error(
+                f"SQL error encountered when retreiving scan instance:{e.args[0]}"
+            )
 
     # Obtain a summary of the results per event type
     def scanResultSummary(self, instanceId, by="type"):
-        if by == "type":
-            qry = "SELECT r.type, e.event_descr, MAX(ROUND(generated)) AS last_in, \
-                count(*) AS total, count(DISTINCT r.data) as utotal FROM \
-                tbl_scan_results r, tbl_event_types e WHERE e.event = r.type \
-                AND r.scan_instance_id = ? GROUP BY r.type ORDER BY e.event_descr"
-
-        if by == "module":
-            qry = "SELECT r.module, '', MAX(ROUND(generated)) AS last_in, \
-                count(*) AS total, count(DISTINCT r.data) as utotal FROM \
-                tbl_scan_results r, tbl_event_types e WHERE e.event = r.type \
-                AND r.scan_instance_id = ? GROUP BY r.module ORDER BY r.module DESC"
-
         if by == "entity":
             qry = "SELECT r.data, e.event_descr, MAX(ROUND(generated)) AS last_in, \
                 count(*) AS total, count(DISTINCT r.data) as utotal FROM \
@@ -454,12 +439,26 @@ class SpiderFootDb:
                 AND e.event_type in ('ENTITY') \
                 GROUP BY r.data, e.event_descr ORDER BY total DESC limit 50"
 
+        elif by == "module":
+            qry = "SELECT r.module, '', MAX(ROUND(generated)) AS last_in, \
+                count(*) AS total, count(DISTINCT r.data) as utotal FROM \
+                tbl_scan_results r, tbl_event_types e WHERE e.event = r.type \
+                AND r.scan_instance_id = ? GROUP BY r.module ORDER BY r.module DESC"
+
+        elif by == "type":
+            qry = "SELECT r.type, e.event_descr, MAX(ROUND(generated)) AS last_in, \
+                count(*) AS total, count(DISTINCT r.data) as utotal FROM \
+                tbl_scan_results r, tbl_event_types e WHERE e.event = r.type \
+                AND r.scan_instance_id = ? GROUP BY r.type ORDER BY e.event_descr"
+
         qvars = [instanceId]
         try:
             self.dbh.execute(qry, qvars)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when fetching result summary: " + e.args[0])
+            self.sf.error(
+                f"SQL error encountered when fetching result summary: {e.args[0]}"
+            )
 
     # Obtain the data for a scan and event type
     def scanResultEvent(self, instanceId, eventType='ALL', filterFp=False):
@@ -488,7 +487,9 @@ class SpiderFootDb:
             self.dbh.execute(qry, qvars)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when fetching result events: " + e.args[0])
+            self.sf.error(
+                f"SQL error encountered when fetching result events: {e.args[0]}"
+            )
 
     # Obtain a unique list of elements
     def scanResultEventUnique(self, instanceId, eventType='ALL', filterFp=False):
@@ -509,7 +510,9 @@ class SpiderFootDb:
             self.dbh.execute(qry, qvars)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when fetching unique result events: " + e.args[0])
+            self.sf.error(
+                f"SQL error encountered when fetching unique result events: {e.args[0]}"
+            )
 
     # Get scan logs
     def scanLogs(self, instanceId, limit=None, fromRowId=None, reverse=False):
@@ -519,10 +522,7 @@ class SpiderFootDb:
             qry += " and rowid > ?"
 
         qry += " ORDER BY generated "
-        if reverse:
-            qry += "ASC"
-        else:
-            qry += "DESC"
+        qry += "ASC" if reverse else "DESC"
         qvars = [instanceId]
 
         if fromRowId:
@@ -536,7 +536,7 @@ class SpiderFootDb:
             self.dbh.execute(qry, qvars)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when fetching scan logs: " + e.args[0])
+            self.sf.error(f"SQL error encountered when fetching scan logs: {e.args[0]}")
 
     # Get scan errors
     def scanErrors(self, instanceId, limit=None):
@@ -553,7 +553,7 @@ class SpiderFootDb:
             self.dbh.execute(qry, qvars)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when fetching scan errors: " + e.args[0])
+            self.sf.error(f"SQL error encountered when fetching scan errors: {e.args[0]}")
 
     # Delete a scan instance
     def scanInstanceDelete(self, instanceId):
@@ -569,18 +569,18 @@ class SpiderFootDb:
             self.dbh.execute(qry4, qvars)
             self.conn.commit()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when deleting scan: " + e.args[0])
+            self.sf.error(f"SQL error encountered when deleting scan: {e.args[0]}")
 
     # Set the false positive flag for a result
     def scanResultsUpdateFP(self, instanceId, resultHashes, fpFlag):
-        for resultHash in resultHashes:
-            qry = "UPDATE tbl_scan_results SET false_positive = ? WHERE \
+        qry = "UPDATE tbl_scan_results SET false_positive = ? WHERE \
                 scan_instance_id = ? AND hash = ?"
+        for resultHash in resultHashes:
             qvars = [fpFlag, instanceId, resultHash]
             try:
                 self.dbh.execute(qry, qvars)
             except sqlite3.Error as e:
-                self.sf.error("SQL error encountered when updating F/P: " + e.args[0], False)
+                self.sf.error(f"SQL error encountered when updating F/P: {e.args[0]}", False)
                 return False
 
         self.conn.commit()
@@ -601,7 +601,9 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvals)
             except sqlite3.Error as e:
-                self.sf.error("SQL error encountered when storing config, aborting: " + e.args[0])
+                self.sf.error(
+                    f"SQL error encountered when storing config, aborting: {e.args[0]}"
+                )
 
             self.conn.commit()
 
@@ -609,17 +611,19 @@ class SpiderFootDb:
     def configGet(self):
         qry = "SELECT scope, opt, val FROM tbl_config"
         try:
-            retval = dict()
+            retval = {}
             self.dbh.execute(qry)
             for [scope, opt, val] in self.dbh.fetchall():
                 if scope == "GLOBAL":
                     retval[opt] = val
                 else:
-                    retval[scope + ":" + opt] = val
+                    retval[f"{scope}:{opt}"] = val
 
             return retval
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when fetching configuration: " + e.args[0])
+            self.sf.error(
+                f"SQL error encountered when fetching configuration: {e.args[0]}"
+            )
 
     # Reset the config to default (clear it from the DB and let the hard-coded
     # settings in the code take effect.)
@@ -629,7 +633,7 @@ class SpiderFootDb:
             self.dbh.execute(qry)
             self.conn.commit()
         except sqlite3.Error as e:
-            self.sf.error("Unable to clear configuration from the database: " + e.args[0])
+            self.sf.error(f"Unable to clear configuration from the database: {e.args[0]}")
 
     # Store a configuration value for a scan
     def scanConfigSet(self, id, optMap=dict()):
@@ -648,7 +652,9 @@ class SpiderFootDb:
             try:
                 self.dbh.execute(qry, qvals)
             except sqlite3.Error as e:
-                self.sf.error("SQL error encountered when storing config, aborting: " + e.args[0])
+                self.sf.error(
+                    f"SQL error encountered when storing config, aborting: {e.args[0]}"
+                )
 
             self.conn.commit()
 
@@ -658,16 +664,18 @@ class SpiderFootDb:
                 WHERE scan_instance_id = ? ORDER BY component, opt"
         qvars = [instanceId]
         try:
-            retval = dict()
+            retval = {}
             self.dbh.execute(qry, qvars)
             for [component, opt, val] in self.dbh.fetchall():
                 if component == "GLOBAL":
                     retval[opt] = val
                 else:
-                    retval[component + ":" + opt] = val
+                    retval[f"{component}:{opt}"] = val
             return retval
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when fetching configuration: " + e.args[0])
+            self.sf.error(
+                f"SQL error encountered when fetching configuration: {e.args[0]}"
+            )
 
     # Store an event
     # eventData is a SpiderFootEvent object with the following variables:
@@ -684,20 +692,15 @@ class SpiderFootDb:
         storeData = ''
 
         if type(sfEvent.data) is not str:
-            # If sfEvent.data is a dict or list, convert it to a string first, as
-            # those types do not have a unicode converter.
-            if type(sfEvent.data) is str:
+            try:
                 storeData = str(sfEvent.data)
-            else:
-                try:
-                    storeData = str(sfEvent.data)
-                except BaseException as e:
-                    self.sf.fatal("Unhandled type detected: " + str(type(sfEvent.data)))
+            except BaseException as e:
+                self.sf.fatal(f"Unhandled type detected: {str(type(sfEvent.data))}")
         else:
             storeData = sfEvent.data
 
         if truncateSize > 0:
-            storeData = storeData[0:truncateSize]
+            storeData = storeData[:truncateSize]
 
         if sfEvent.sourceEventHash in ["", None]:
             self.sf.fatal("UNABLE TO CREATE RECORD WITH EMPTY SOURCE EVENT HASH!")
@@ -717,7 +720,9 @@ class SpiderFootDb:
             self.conn.commit()
             return None
         except sqlite3.Error as e:
-            self.sf.fatal("SQL error encountered when storing event data (" + str(self.dbh) + ": " + e.args[0])
+            self.sf.fatal(
+                f"SQL error encountered when storing event data ({str(self.dbh)}: {e.args[0]}"
+            )
 
     # List of all previously run scans
     def scanInstanceList(self):
@@ -738,7 +743,7 @@ class SpiderFootDb:
             self.dbh.execute(qry)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when fetching scan list: " + e.args[0])
+            self.sf.error(f"SQL error encountered when fetching scan list: {e.args[0]}")
 
     # History of data from the scan
     def scanResultHistory(self, instanceId):
@@ -750,7 +755,7 @@ class SpiderFootDb:
             self.dbh.execute(qry, qvars)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when fetching scan history: " + e.args[0])
+            self.sf.error(f"SQL error encountered when fetching scan history: {e.args[0]}")
 
 
     # Get the source IDs, types and data for a set of IDs
@@ -769,14 +774,16 @@ class SpiderFootDb:
         qvars = [instanceId]
 
         for hashId in elementIdList:
-            qry = qry + "'" + hashId + "',"
+            qry = f"{qry}'{hashId}',"
         qry += "'')"
 
         try:
             self.dbh.execute(qry, qvars)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when getting source element IDs: " + e.args[0])
+            self.sf.error(
+                f"SQL error encountered when getting source element IDs: {e.args[0]}"
+            )
 
     # Get the child IDs, types and data for a set of IDs
     def scanElementChildrenDirect(self, instanceId, elementIdList):
@@ -794,14 +801,16 @@ class SpiderFootDb:
         qvars = [instanceId]
 
         for hashId in elementIdList:
-            qry = qry + "'" + hashId + "',"
+            qry = f"{qry}'{hashId}',"
         qry += "'')"
 
         try:
             self.dbh.execute(qry, qvars)
             return self.dbh.fetchall()
         except sqlite3.Error as e:
-            self.sf.error("SQL error encountered when getting child element IDs: " + e.args[0])
+            self.sf.error(
+                f"SQL error encountered when getting child element IDs: {e.args[0]}"
+            )
 
     # Get the full set of upstream IDs which are parents to the
     # supplied set of IDs.
@@ -810,9 +819,9 @@ class SpiderFootDb:
     def scanElementSourcesAll(self, instanceId, childData):
         # Get the first round of source IDs for the leafs
         keepGoing = True
-        nextIds = list()
-        datamap = dict()
-        pc = dict()
+        nextIds = []
+        datamap = {}
+        pc = {}
 
         for row in childData:
             # these must be unique values!
@@ -832,7 +841,7 @@ class SpiderFootDb:
 
         while keepGoing:
             parentSet = self.scanElementSourcesDirect(instanceId, nextIds)
-            nextIds = list()
+            nextIds = []
             keepGoing = False
 
             for row in parentSet:
@@ -861,27 +870,22 @@ class SpiderFootDb:
     # NOTE FOR NOW THE BEHAVIOR IS NOT THE SAME AS THE scanElementParent*
     # FUNCTIONS - THIS ONLY RETURNS IDS!!
     def scanElementChildrenAll(self, instanceId, parentIds):
-        datamap = list()
         keepGoing = True
-        nextIds = list()
+        nextIds = []
 
         nextSet = self.scanElementChildrenDirect(instanceId, parentIds)
-        for row in nextSet:
-            datamap.append(row[8])
-
+        datamap = [row[8] for row in nextSet]
         for row in nextSet:
             if row[8] not in nextIds:
                 nextIds.append(row[8])
 
         while keepGoing:
             nextSet = self.scanElementChildrenDirect(instanceId, nextIds)
-            if nextSet == None or len(nextSet) == 0:
+            if nextSet is None or len(nextSet) == 0:
                 keepGoing = False
                 break
 
             for row in nextSet:
                 datamap.append(row[8])
-                nextIds = list()
-                nextIds.append(row[8])
-
+                nextIds = [row[8]]
         return datamap

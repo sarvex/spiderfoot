@@ -63,22 +63,20 @@ class sfp_arin(SpiderFootPlugin):
 
     # Owner information about an AS
     def query(self, qtype, value):
-        ownerinfo = dict()
+        ownerinfo = {}
         url = "https://whois.arin.net/rest/"
 
         if qtype == "domain":
-            url += "pocs;domain=@" + value
+            url += f"pocs;domain=@{value}"
 
         try:
             if qtype == "name":
                 fname, lname = value.split(" ", 1)
                 if fname.endswith(","):
-                    t = fname
-                    fname = lname
-                    lname = t
-                url += "pocs;first=" + fname + ";last=" + lname
+                    fname, lname = lname, fname
+                url += f"pocs;first={fname};last={lname}"
         except BaseException as e:
-            self.sf.debug("Couldn't process name: " + value + " (" + str(e) + ")")
+            self.sf.debug(f"Couldn't process name: {value} ({str(e)})")
             return None
 
         if qtype == "contact":
@@ -86,14 +84,13 @@ class sfp_arin(SpiderFootPlugin):
 
         res = self.fetchRir(url)
         if res['content'] is None:
-            self.sf.debug("No info found/available for " + value + " at ARIN.")
+            self.sf.debug(f"No info found/available for {value} at ARIN.")
             return None
 
         try:
-            j = json.loads(res['content'])
-            return j
+            return json.loads(res['content'])
         except Exception as e:
-            self.sf.debug("Error processing JSON response: " + str(e))
+            self.sf.debug(f"Error processing JSON response: {str(e)}")
             return None
 
     # Handle events sent to this module
@@ -103,11 +100,11 @@ class sfp_arin(SpiderFootPlugin):
         eventData = event.data
         self.currentEventSrc = event
 
-        self.sf.debug("Received event, " + eventName + ", from " + srcModuleName)
+        self.sf.debug(f"Received event, {eventName}, from {srcModuleName}")
 
         # Don't look up stuff twice
         if eventData in self.results:
-            self.sf.debug("Skipping " + eventData + " as already mapped.")
+            self.sf.debug(f"Skipping {eventData} as already mapped.")
             return None
         else:
             self.results[eventData] = True
@@ -116,47 +113,51 @@ class sfp_arin(SpiderFootPlugin):
             ret = self.query("domain", eventData)
             if not ret:
                 return None
-            if "pocs" in ret:
-                if "pocRef" in ret['pocs']:
-                    ref = list()
+            if "pocs" in ret and "pocRef" in ret['pocs']:
+                ref = []
                     # Might be a list or a dictionary
-                    if type(ret['pocs']['pocRef']) == dict:
-                        ref = [ret['pocs']['pocRef']]
-                    else:
-                        ref = ret['pocs']['pocRef']
-                    for p in ref:
-                        name = p['@name']
-                        if "," in name:
-                            sname = name.split(", ", 1)
-                            name = sname[1] + " " + sname[0]
+                ref = (
+                    [ret['pocs']['pocRef']]
+                    if type(ret['pocs']['pocRef']) == dict
+                    else ret['pocs']['pocRef']
+                )
+                for p in ref:
+                    name = p['@name']
+                    if "," in name:
+                        sname = name.split(", ", 1)
+                        name = f"{sname[1]} {sname[0]}"
 
                         # A bit of a hack. The reason we do this is because
                         # the names are separated in the content and sfp_names
                         # won't recognise it. So we submit this and see if it
                         # really is considered a name.
-                        evt = SpiderFootEvent("RAW_RIR_DATA", "Possible full name: " + name,
-                                              self.__name__, self.currentEventSrc)
-                        self.notifyListeners(evt)
+                    evt = SpiderFootEvent(
+                        "RAW_RIR_DATA",
+                        f"Possible full name: {name}",
+                        self.__name__,
+                        self.currentEventSrc,
+                    )
+                    self.notifyListeners(evt)
 
-                        # We just want the raw data so we can get potential
-                        # e-mail addresses.
-                        self.query("contact", p['$'])
+                    # We just want the raw data so we can get potential
+                    # e-mail addresses.
+                    self.query("contact", p['$'])
 
-        if eventName == "HUMAN_NAME":
+        elif eventName == "HUMAN_NAME":
             ret = self.query("name", eventData)
             if not ret:
                 return None
-            if "pocs" in ret:
-                if "pocRef" in ret['pocs']:
-                    ref = list()
+            if "pocs" in ret and "pocRef" in ret['pocs']:
+                ref = []
                     # Might be a list or a dictionary
-                    if type(ret['pocs']['pocRef']) == dict:
-                        ref = [ret['pocs']['pocRef']]
-                    else:
-                        ref = ret['pocs']['pocRef']
-                    for p in ref:
-                        # We just want the raw data so we can get potential
-                        # e-mail addresses.
-                        self.query("contact", p['$'])
+                ref = (
+                    [ret['pocs']['pocRef']]
+                    if type(ret['pocs']['pocRef']) == dict
+                    else ret['pocs']['pocRef']
+                )
+                for p in ref:
+                    # We just want the raw data so we can get potential
+                    # e-mail addresses.
+                    self.query("contact", p['$'])
 
 # End of sfp_arin class

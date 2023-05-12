@@ -53,7 +53,7 @@ class sfp_archiveorg(SpiderFootPlugin):
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.results = self.tempStorage()
-        self.foundDates = list()
+        self.foundDates = []
 
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
@@ -76,11 +76,11 @@ class sfp_archiveorg(SpiderFootPlugin):
 
     # Handle events sent to this module
     def handleEvent(self, event):
-        eventName = event.eventType
         srcModuleName = event.module
         eventData = event.data
 
-        self.sf.debug("Received event, " + eventName + ", from " + srcModuleName)
+        eventName = event.eventType
+        self.sf.debug(f"Received event, {eventName}, from {srcModuleName}")
 
         if eventName == "INTERESTING_FILE" and not self.opts['intfiles']:
             return None
@@ -110,13 +110,12 @@ class sfp_archiveorg(SpiderFootPlugin):
             newDate = datetime.datetime.now() - datetime.timedelta(days=int(daysback))
             maxDate = newDate.strftime("%Y%m%d")
 
-            url = "https://archive.org/wayback/available?url=" + eventData + \
-                  "&timestamp=" + maxDate
+            url = f"https://archive.org/wayback/available?url={eventData}&timestamp={maxDate}"
             res = self.sf.fetchUrl(url, timeout=self.opts['_fetchtimeout'],
                                    useragent=self.opts['_useragent'])
 
-            if res['content'] == None:
-                self.sf.error("Unable to fetch " + url, False)
+            if res['content'] is None:
+                self.sf.error(f"Unable to fetch {url}", False)
                 continue
 
             try:
@@ -124,13 +123,15 @@ class sfp_archiveorg(SpiderFootPlugin):
             except BaseException as e:
                 ret = None
 
-            if ret == None:
-                self.sf.error("Unable to process empty response from archive.org: " + \
-                              eventData, False)
+            if ret is None:
+                self.sf.error(
+                    f"Unable to process empty response from archive.org: {eventData}",
+                    False,
+                )
                 continue
 
             if len(ret['archived_snapshots']) < 1:
-                self.sf.debug("No archived snapshots for " + eventData)
+                self.sf.debug(f"No archived snapshots for {eventData}")
                 continue
 
             wbmlink = ret['archived_snapshots']['closest']['url']
@@ -139,9 +140,9 @@ class sfp_archiveorg(SpiderFootPlugin):
                 continue
 
             self.foundDates.append(wbmlink)
-            name = eventName + "_HISTORIC"
+            name = f"{eventName}_HISTORIC"
 
-            self.sf.info("Found a historic file: " + wbmlink)
+            self.sf.info(f"Found a historic file: {wbmlink}")
             evt = SpiderFootEvent(name, wbmlink, self.__name__, event)
             self.notifyListeners(evt)
 

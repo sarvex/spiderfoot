@@ -33,12 +33,13 @@ class SpiderFootScanner(threading.Thread):
                  globalOpts, moduleOpts):
 
         # Initialize the thread
-        threading.Thread.__init__(self, name="SF_" + scanId + \
-                                             str(random.SystemRandom().randint(100000, 999999)))
+        threading.Thread.__init__(
+            self,
+            name=f"SF_{scanId}{str(random.SystemRandom().randint(100000, 999999))}",
+        )
 
         # Temporary data to be used in startScan
-        self.temp = dict()
-        self.temp['config'] = deepcopy(globalOpts)
+        self.temp = {'config': deepcopy(globalOpts)}
         self.temp['targetValue'] = scanTarget
         self.temp['targetType'] = targetType
         self.temp['moduleList'] = moduleList
@@ -61,9 +62,7 @@ class SpiderFootScanner(threading.Thread):
         self.startScan()
 
     def getId(self):
-        if hasattr(self.ts, 'scanId'):
-            return self.ts.scanId
-        return None
+        return self.ts.scanId if hasattr(self.ts, 'scanId') else None
 
     # Start running a scan
     def startScan(self):

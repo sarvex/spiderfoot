@@ -60,7 +60,7 @@ class sfp_ahmia(SpiderFootPlugin):
             return None
 
         if eventData in self.results:
-            self.sf.debug("Already did a search for " + eventData + ", skipping.")
+            self.sf.debug(f"Already did a search for {eventData}, skipping.")
             return None
         else:
             self.results[eventData] = True
@@ -85,43 +85,43 @@ class sfp_ahmia(SpiderFootPlugin):
             for link in links:
                 if link in self.results:
                     continue
-                else:
-                    self.results[link] = True
-                    self.sf.debug("Found a darknet mention: " + link)
-                    if self.sf.urlFQDN(link).endswith(".onion"):
-                        if self.checkForStop():
-                            return None
-                        if self.opts['fetchlinks']:
-                            res = self.sf.fetchUrl(link, timeout=self.opts['_fetchtimeout'],
-                                                   useragent=self.opts['_useragent'])
+                self.results[link] = True
+                self.sf.debug(f"Found a darknet mention: {link}")
+                if self.sf.urlFQDN(link).endswith(".onion"):
+                    if self.checkForStop():
+                        return None
+                    if self.opts['fetchlinks']:
+                        res = self.sf.fetchUrl(link, timeout=self.opts['_fetchtimeout'],
+                                               useragent=self.opts['_useragent'])
 
-                            if res['content'] is None:
-                                self.sf.debug("Ignoring " + link + " as no data returned")
-                                continue
+                        if res['content'] is None:
+                            self.sf.debug(f"Ignoring {link} as no data returned")
+                            continue
 
-                            if eventData not in res['content']:
-                                self.sf.debug("Ignoring " + link + " as no mention of " + eventData)
-                                continue
-                            evt = SpiderFootEvent("DARKNET_MENTION_URL", link, self.__name__, event)
-                            self.notifyListeners(evt)
+                        if eventData not in res['content']:
+                            self.sf.debug(f"Ignoring {link} as no mention of {eventData}")
+                            continue
+                        evt = SpiderFootEvent("DARKNET_MENTION_URL", link, self.__name__, event)
+                        self.notifyListeners(evt)
 
-                            try:
-                                startIndex = res['content'].index(eventData) - 120
-                                endIndex = startIndex + len(eventData) + 240
-                            except BaseException as e:
-                                self.sf.debug("String not found in content.")
-                                continue
+                        try:
+                            startIndex = res['content'].index(eventData) - 120
+                            endIndex = startIndex + len(eventData) + 240
+                        except BaseException as e:
+                            self.sf.debug("String not found in content.")
+                            continue
 
-                            wdata = res['content'][startIndex:endIndex]
-                            evt = SpiderFootEvent("DARKNET_MENTION_CONTENT", "..." + wdata + "...",
-                                                  self.__name__, evt)
-                            self.notifyListeners(evt)
-                            reported = True
-                        else:
-                            evt = SpiderFootEvent("DARKNET_MENTION_URL", link, self.__name__, event)
-                            self.notifyListeners(evt)
-                            reported = True
-
+                        wdata = res['content'][startIndex:endIndex]
+                        evt = SpiderFootEvent(
+                            "DARKNET_MENTION_CONTENT",
+                            f"...{wdata}...",
+                            self.__name__,
+                            evt,
+                        )
+                    else:
+                        evt = SpiderFootEvent("DARKNET_MENTION_URL", link, self.__name__, event)
+                    reported = True
+                    self.notifyListeners(evt)
             if reported:
                 # Submit the search results for analysis
                 evt = SpiderFootEvent("SEARCH_ENGINE_WEB_CONTENT", data['content'],

@@ -52,8 +52,8 @@ class sfp_accounts(SpiderFootPlugin):
     def setup(self, sfc, userOpts=dict()):
         self.sf = sfc
         self.results = self.tempStorage()
-        self.commonNames = list()
-        self.reportedUsers = list()
+        self.commonNames = []
+        self.reportedUsers = []
         self.errorState = False
         self.distrustedChecked = False
         self.__dataSource__ = "Social Media"
@@ -70,7 +70,7 @@ class sfp_accounts(SpiderFootPlugin):
             url = "https://raw.githubusercontent.com/WebBreacher/WhatsMyName/master/web_accounts_list.json"
             data = self.sf.fetchUrl(url, useragent="SpiderFoot")
             if data['content'] is None:
-                self.sf.error("Unable to fetch " + url, False)
+                self.sf.error(f"Unable to fetch {url}", False)
                 self.errorState = True
                 return None
             else:
@@ -96,7 +96,7 @@ class sfp_accounts(SpiderFootPlugin):
 
         url = site['check_uri'].format(account=name)
         retname = site['name'] + " (Category: " + site['category'] + ")\n<SFURL>" + \
-                url + "</SFURL>"
+                    url + "</SFURL>"
 
         res = self.sf.fetchUrl(url, timeout=self.opts['_fetchtimeout'],
                                useragent=self.opts['_useragent'], noLog=True)
@@ -106,64 +106,72 @@ class sfp_accounts(SpiderFootPlugin):
                 self.siteResults[retname] = False
             return
 
-        if res['code']:
-            if res['code'].startswith("4") or res['code'].startswith("5"):
-                with self.lock:
-                    self.siteResults[retname] = False
-                return
+        if res['code'] and (
+            res['code'].startswith("4") or res['code'].startswith("5")
+        ):
+            with self.lock:
+                self.siteResults[retname] = False
+            return
 
         try:
             found = False
             site['account_existence_code'] = str(site['account_existence_code'])
-            if site['account_existence_code']:
-                if site['account_existence_code'] == res['code']:
-                    found = True
-            if site['account_missing_code']:
-                if site['account_missing_code'] == res['code']:
-                    found = False
-            if site['account_existence_string']:
-                if site['account_existence_string'] in res['content']:
-                    found = True
-            if site['account_missing_string']:
-                if site['account_missing_string'] in res['content']:
-                    found = False
+            if (
+                site['account_existence_code']
+                and site['account_existence_code'] == res['code']
+            ):
+                found = True
+            if (
+                site['account_missing_code']
+                and site['account_missing_code'] == res['code']
+            ):
+                found = False
+            if (
+                site['account_existence_string']
+                and site['account_existence_string'] in res['content']
+            ):
+                found = True
+            if (
+                site['account_missing_string']
+                and site['account_missing_string'] in res['content']
+            ):
+                found = False
         except BaseException:
-            self.sf.debug("Error parsing configuration: " + str(site))
+            self.sf.debug(f"Error parsing configuration: {str(site)}")
             found = False
 
-        if found and self.opts['musthavename']:
-            if name not in res['content']:
-                self.sf.debug("Skipping " + site['name'] + " as username not mentioned.")
-                found = False
+        if found and self.opts['musthavename'] and name not in res['content']:
+            self.sf.debug("Skipping " + site['name'] + " as username not mentioned.")
+            found = False
 
         # Some sites can't handle periods so treat bob.abc and bob as the same
         if found and "." in name:
             firstname = name.split(".")[0]
 
-            if firstname + "<" in res['content'] or firstname + '"' in res['content']:
+            if (
+                f"{firstname}<" in res['content']
+                or f'{firstname}"' in res['content']
+            ):
                 found = False
 
         with self.lock:
             self.siteResults[retname] = found
 
     def threadSites(self, name, siteList):
-        ret = list()
-        self.siteResults = dict()
+        ret = []
+        self.siteResults = {}
         running = True
-        i = 0
         t = []
 
-        for site in siteList:
+        for i, site in enumerate(siteList):
             if self.checkForStop():
                 return None
 
             self.sf.info("Spawning thread to check site: " + site['name'] + \
-                        " / " + site['check_uri'].format(account=name))
+                            " / " + site['check_uri'].format(account=name))
             t.append(threading.Thread(name='thread_sfp_accounts_' + site['name'],
                                       target=self.checkSite, args=(name, site)))
             t[i].start()
-            i += 1
-
         # Block until all threads are finished
         while running:
             found = False
@@ -181,8 +189,8 @@ class sfp_accounts(SpiderFootPlugin):
 
     def batchSites(self, name):
         i = 0
-        res = list()
-        siteList = list()
+        res = []
+        siteList = []
 
         for site in self.sites:
             if not site['valid'] or 'check_uri' not in site:
@@ -190,27 +198,22 @@ class sfp_accounts(SpiderFootPlugin):
                 continue
             if i >= self.opts['_maxthreads']:
                 data = self.threadSites(name, siteList)
-                if data == None:
+                if data is None:
                     return res
 
-                for ret in list(data.keys()):
-                    if data[ret]:
-                        res.append(ret)
+                res.extend(ret for ret in list(data.keys()) if data[ret])
                 i = 0
-                siteList = list()
+                siteList = []
 
             siteList.append(site)
             i += 1
 
         if i > 0 and i < self.opts['_maxthreads']:
             data = self.threadSites(name, siteList)
-            if data == None:
+            if data is None:
                 return res
 
-            for ret in list(data.keys()):
-                if data[ret]:
-                    res.append(ret)
-
+            res.extend(ret for ret in list(data.keys()) if data[ret])
         return res
 
     # Handle events sent to this module
@@ -218,12 +221,12 @@ class sfp_accounts(SpiderFootPlugin):
         eventName = event.eventType
         srcModuleName = event.module
         eventData = event.data
-        users = list()
+        users = []
 
         if self.errorState:
             return None
 
-        self.sf.debug("Received event, " + eventName + ", from " + srcModuleName)
+        self.sf.debug(f"Received event, {eventName}, from {srcModuleName}")
 
         # Skip events coming from me unless they are USERNAME events
         if eventName != "USERNAME" and srcModuleName == "sfp_accounts":
@@ -237,58 +240,50 @@ class sfp_accounts(SpiderFootPlugin):
         # If being called for the first time, let's see how trusted the
         # sites are by attempting to fetch a garbage user.
         if not self.distrustedChecked:
-            # Check if a state cache exists first, to not have to do this all the time
-            content = self.sf.cacheGet("sfaccounts_state", 72)
-            if content:
-                delsites = list()
-                for line in content.split("\n"):
-                    if line == '':
-                        continue
-                    delsites.append(line)
+            if content := self.sf.cacheGet("sfaccounts_state", 72):
+                delsites = [line for line in content.split("\n") if line != '']
                 self.sites = [d for d in self.sites if d['name'] not in delsites]
             else:
                 randpool = 'abcdefghijklmnopqrstuvwxyz1234567890'
-                randuser = ''.join([random.SystemRandom().choice(randpool) for x in range(10)])
+                randuser = ''.join([random.SystemRandom().choice(randpool) for _ in range(10)])
                 res = self.batchSites(randuser)
                 if len(res) > 0:
-                    delsites = list()
+                    delsites = []
                     for site in res:
                         sitename = site.split(" (Category:")[0]
-                        self.sf.debug("Distrusting " + sitename)
+                        self.sf.debug(f"Distrusting {sitename}")
                         delsites.append(sitename)
                     self.sites = [d for d in self.sites if d['name'] not in delsites]
                     self.sf.cachePut("sfaccounts_state", delsites)
 
             self.distrustedChecked = True
 
-        if eventName == "HUMAN_NAME":
-            names = [ eventData.lower().replace(" ", ""), eventData.lower().replace(" ", ".") ]
-            for name in names:
-                users.append(name)
-
         if eventName == "DOMAIN_NAME":
             kw = self.sf.domainKeyword(eventData, self.opts['_internettlds'])
             users.append(kw)
 
-        if eventName == "EMAILADDR":
+        elif eventName == "EMAILADDR":
             name = eventData.split("@")[0].lower()
             users.append(name)
 
-        if eventName == "USERNAME":
+        elif eventName == "HUMAN_NAME":
+            names = [ eventData.lower().replace(" ", ""), eventData.lower().replace(" ", ".") ]
+            users.extend(iter(names))
+        elif eventName == "USERNAME":
             users.append(eventData)
 
+        adduser = True
         for user in users:
-            adduser = True
-            if self.opts['generic'] is list() and user in self.opts['generic']:
-                self.sf.debug(user + " is a generic account name, skipping.")
+            if self.opts['generic'] is [] and user in self.opts['generic']:
+                self.sf.debug(f"{user} is a generic account name, skipping.")
                 continue
 
             if self.opts['ignorenamedict'] and user in self.commonNames:
-                self.sf.debug(user + " is found in our name dictionary, skipping.")
+                self.sf.debug(f"{user} is found in our name dictionary, skipping.")
                 continue
 
             if self.opts['ignoreworddict'] and user in self.words:
-                self.sf.debug(user + " is found in our word dictionary, skipping.")
+                self.sf.debug(f"{user} is found in our word dictionary, skipping.")
                 continue
 
             res = self.batchSites(user)

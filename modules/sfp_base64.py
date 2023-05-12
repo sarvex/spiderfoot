@@ -51,7 +51,7 @@ class sfp_base64(SpiderFootPlugin):
         srcModuleName = event.module
         eventData = event.data
 
-        self.sf.debug("Received event, " + eventName + ", from " + srcModuleName)
+        self.sf.debug(f"Received event, {eventName}, from {srcModuleName}")
 
         pat = re.compile("([A-Za-z0-9+\/]+\=\=|[A-Za-z0-9+\/]+\=)")
         m = re.findall(pat, eventData)
@@ -65,12 +65,12 @@ class sfp_base64(SpiderFootPlugin):
                 # Base64-encoded strings don't look like normal strings
                 if caps < (minlen/4):
                     return None
-                self.sf.info("Found Base64 string: " + match)
+                self.sf.info(f"Found Base64 string: {match}")
                 if type(match) != str:
                     string = str(match)
 
                 try:
-                    string += " (" + base64.b64decode(match) + ")"
+                    string += f" ({base64.b64decode(match)})"
                     evt = SpiderFootEvent("BASE64_DATA", string, self.__name__, event)
                     self.notifyListeners(evt)
                 except BaseException as e:

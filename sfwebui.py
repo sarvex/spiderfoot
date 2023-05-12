@@ -66,7 +66,11 @@ class SpiderFootWebUi:
         print("")
         print("*************************************************************")
         print(" Use SpiderFoot by starting your web browser of choice and ")
-        print(" browse to http://" + addr + ":" + str(self.config['__webport']) + self.docroot)
+        print(
+            f" browse to http://{addr}:"
+            + str(self.config['__webport'])
+            + self.docroot
+        )
         print("*************************************************************")
         print("")
         print("")
@@ -85,7 +89,7 @@ class SpiderFootWebUi:
 
     # Sanitize user input
     def cleanUserInput(self, inputList):
-        ret = list()
+        ret = []
 
         for item in inputList:
             c = html.escape(item, True)
@@ -99,11 +103,11 @@ class SpiderFootWebUi:
     def searchBase(self, id=None, eventType=None, value=None):
         regex = ""
         if [id, eventType, value].count('') == 3 or \
-                        [id, eventType, value].count(None) == 3:
+                            [id, eventType, value].count(None) == 3:
             return None
 
         if value.startswith("/") and value.endswith("/"):
-            regex = value[1:len(value) - 1]
+            regex = value[1:-1]
             value = ""
 
         value = value.replace('*', '%')
@@ -158,8 +162,8 @@ class SpiderFootWebUi:
     # Get result data in CSV format for multiple scans
     def scaneventresultexportmulti(self, ids, dialect="excel"):
         dbh = SpiderFootDb(self.config)
-        scaninfo = dict()
-        data = list()
+        scaninfo = {}
+        data = []
         for id in ids.split(','):
             scaninfo[id] = dbh.scanInstanceGet(id)
             data = data + dbh.scanResultEvent(id)
@@ -204,7 +208,7 @@ class SpiderFootWebUi:
     # Export results from multiple scans in JSON format
     def scanexportjsonmulti(self, ids):
         dbh = SpiderFootDb(self.config)
-        scaninfo = list()
+        scaninfo = []
 
         for id in ids.split(','):
             scan = dbh.scanInstanceGet(id)
@@ -217,13 +221,13 @@ class SpiderFootWebUi:
             for row in dbh.scanResultEvent(id):
                 lastseen = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
                 event_data = str(row[1]).replace("<SFURL>", "").replace("</SFURL>", "")
-                source_data = str(row[2])
-                source_module = str(row[3])
                 event_type = row[4]
-                false_positive = row[13]
-
                 if event_type == "ROOT":
                     continue
+
+                source_data = str(row[2])
+                source_module = str(row[3])
+                false_positive = row[13]
 
                 scaninfo.append({
                     "data": event_data,
@@ -250,13 +254,12 @@ class SpiderFootWebUi:
         data = dbh.scanResultEvent(id, filterFp=True)
         scan = dbh.scanInstanceGet(id)
         root = scan[1]
-        if gexf != "0":
-            cherrypy.response.headers['Content-Disposition'] = "attachment; filename=SpiderFoot.gexf"
-            cherrypy.response.headers['Content-Type'] = "application/gexf"
-            cherrypy.response.headers['Pragma'] = "no-cache"
-            return sf.buildGraphGexf([root], "SpiderFoot Export", data)
-        else:
+        if gexf == "0":
             return sf.buildGraphJson([root], data)
+        cherrypy.response.headers['Content-Disposition'] = "attachment; filename=SpiderFoot.gexf"
+        cherrypy.response.headers['Content-Type'] = "application/gexf"
+        cherrypy.response.headers['Pragma'] = "no-cache"
+        return sf.buildGraphGexf([root], "SpiderFoot Export", data)
 
     scanviz.exposed = True
 
@@ -264,8 +267,8 @@ class SpiderFootWebUi:
     def scanvizmulti(self, ids, gexf="1"):
         dbh = SpiderFootDb(self.config)
         sf = SpiderFoot(self.config)
-        data = list()
-        roots = list()
+        data = []
+        roots = []
         for id in ids.split(','):
             data = data + dbh.scanResultEvent(id, filterFp=True)
             roots.append(dbh.scanInstanceGet(id)[1])
@@ -284,10 +287,8 @@ class SpiderFootWebUi:
 
     # Configuration used for a scan
     def scanopts(self, id):
-        ret = dict()
         dbh = SpiderFootDb(self.config)
-        ret['config'] = dbh.scanConfigGet(id)
-        ret['configdesc'] = dict()
+        ret = {'config': dbh.scanConfigGet(id), 'configdesc': {}}
         for key in list(ret['config'].keys()):
             if ':' not in key:
                 ret['configdesc'][key] = self.config['__globaloptdescs__'][key]
@@ -322,8 +323,8 @@ class SpiderFootWebUi:
     def rerunscan(self, id):
         # Snapshot the current configuration to be used by the scan
         cfg = deepcopy(self.config)
-        modopts = dict() # Not used yet as module options are set globally
-        modlist = list()
+        modopts = {}
+        modlist = []
         sf = SpiderFoot(cfg)
         dbh = SpiderFootDb(cfg)
         info = dbh.scanInstanceGet(id)
@@ -340,7 +341,7 @@ class SpiderFootWebUi:
             modlist.remove("sfp__stor_stdout")
 
         targetType = sf.targetType(scantarget)
-        if targetType == None:
+        if targetType is None:
             # It must then be a name, as a re-run scan should always have a clean
             # target.
             targetType = "HUMAN_NAME"
@@ -355,7 +356,7 @@ class SpiderFootWebUi:
         t.start()
 
         # Wait until the scan has initialized
-        while globalScanStatus.getStatus(newId) == None:
+        while globalScanStatus.getStatus(newId) is None:
             print("[info] Waiting for the scan to initialize...")
             time.sleep(1)
 
@@ -368,8 +369,8 @@ class SpiderFootWebUi:
     def rerunscanmulti(self, ids):
         # Snapshot the current configuration to be used by the scan
         cfg = deepcopy(self.config)
-        modopts = dict() # Not used yet as module options are set globally
-        modlist = list()
+        modopts = {}
+        modlist = []
         sf = SpiderFoot(cfg)
         dbh = SpiderFootDb(cfg)
 
@@ -388,10 +389,10 @@ class SpiderFootWebUi:
                 modlist.remove("sfp__stor_stdout")
 
             targetType = sf.targetType(scantarget)
-            if targetType == None:
+            if targetType is None:
                 # Should never be triggered for a re-run scan..
                 return self.error("Invalid target type. Could not recognize it as " + \
-                                  "a human name, IP address, IP subnet, ASN, domain name or host name.")
+                                      "a human name, IP address, IP subnet, ASN, domain name or host name.")
 
             # Start running a new scan
             newId = sf.genScanInstanceGUID(scanname)
@@ -399,7 +400,7 @@ class SpiderFootWebUi:
             t.start()
 
             # Wait until the scan has initialized
-            while globalScanStatus.getStatus(newId) == None:
+            while globalScanStatus.getStatus(newId) is None:
                 print("[info] Waiting for the scan to initialize...")
                 time.sleep(1)
 
@@ -436,9 +437,9 @@ class SpiderFootWebUi:
             return self.error("Something went wrong internally.")
 
         targetType = sf.targetType(scantarget)
-        if targetType == None:
+        if targetType is None:
             # It must be a name, so wrap quotes around it
-            scantarget = "&quot;" + scantarget + "&quot;"
+            scantarget = f"&quot;{scantarget}&quot;"
 
         modlist = scanconfig['_modulesenabled'].split(',')
 
@@ -487,11 +488,8 @@ class SpiderFootWebUi:
         for opt in sorted(conf):
             if ":_" in opt or opt.startswith("_"):
                 continue
-            if not pattern:
-                content += opt + "=" + str(conf[opt]) + "\n"
-            else:
-                if pattern in opt:
-                    content += opt + "=" + str(conf[opt]) + "\n"
+            if pattern and pattern in opt or not pattern:
+                content += f"{opt}={str(conf[opt])}" + "\n"
         cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="SpiderFoot.cfg"'
         cherrypy.response.headers['Content-Type'] = "text/plain"
         return content
@@ -500,7 +498,7 @@ class SpiderFootWebUi:
 
     # Settings
     def optsraw(self):
-        ret = dict()
+        ret = {}
         self.token = random.SystemRandom().randint(0, 99999999)
         for opt in self.config:
             if opt.startswith('__'):
@@ -509,9 +507,9 @@ class SpiderFootWebUi:
                         for mo in sorted(self.config['__modules__'][mod]['opts'].keys()):
                             if mo.startswith("_"):
                                 continue
-                            ret["module." + mod + "." + mo] = self.config['__modules__'][mod]['opts'][mo]
+                            ret[f"module.{mod}.{mo}"] = self.config['__modules__'][mod]['opts'][mo]
                 continue
-            ret["global." + opt] = self.config[opt]
+            ret[f"global.{opt}"] = self.config[opt]
         return json.dumps(['SUCCESS', {'token': self.token, 'data': ret}])
 
     optsraw.exposed = True
@@ -539,22 +537,27 @@ class SpiderFootWebUi:
                 return json.dumps(["SUCCESS", ""])
         else:
             templ = Template(filename='dyn/scandelete.tmpl', lookup=self.lookup)
-            return templ.render(id=id, name=str(res[0]),
-                                names=list(), ids=list(),
-                                pageid="SCANLIST", docroot=self.docroot)
+            return templ.render(
+                id=id,
+                name=str(res[0]),
+                names=[],
+                ids=[],
+                pageid="SCANLIST",
+                docroot=self.docroot,
+            )
 
     scandelete.exposed = True
 
     # Delete a scan
     def scandeletemulti(self, ids, confirm=None):
         dbh = SpiderFootDb(self.config)
-        names = list()
+        names = []
 
         for id in ids.split(','):
             res = dbh.scanInstanceGet(id)
             names.append(str(res[0]))
             if res is None:
-                return self.error("Scan ID not found (" + id + ").")
+                return self.error(f"Scan ID not found ({id}).")
 
             if res[5] in [ "RUNNING", "STARTING", "STARTED" ]:
                 return self.error("You cannot delete running scans.")
@@ -573,26 +576,27 @@ class SpiderFootWebUi:
     # Save settings, also used to completely reset them to default
     def savesettings(self, allopts, token, configFile=None):
         if str(token) != str(self.token):
-            return self.error("Invalid token (" + str(self.token) + ").")
+            return self.error(f"Invalid token ({str(self.token)}).")
 
-        if configFile:  # configFile seems to get set even if a file isn't uploaded
-            if configFile.file:
-                contents = configFile.file.read()
+        if configFile and configFile.file:
+            contents = configFile.file.read()
 
-                if type(contents) == bytes:
-                    contents = contents.decode("utf-8")
-                try:
-                    tmp = dict()
-                    for line in contents.split("\n"):
-                        if "=" not in line:
-                            continue
-                        l = line.strip().split("=")
-                        if len(l) == 1:
-                            l[1] = ""
-                        tmp[l[0]] = l[1]
-                    allopts = json.dumps(tmp)
-                except BaseException as e:
-                    return self.error("Failed to parse input file. Was it generated from SpiderFoot? (" + str(e) + ")")
+            if type(contents) == bytes:
+                contents = contents.decode("utf-8")
+            try:
+                tmp = {}
+                for line in contents.split("\n"):
+                    if "=" not in line:
+                        continue
+                    l = line.strip().split("=")
+                    if len(l) == 1:
+                        l[1] = ""
+                    tmp[l[0]] = l[1]
+                allopts = json.dumps(tmp)
+            except BaseException as e:
+                return self.error(
+                    f"Failed to parse input file. Was it generated from SpiderFoot? ({str(e)})"
+                )
 
         try:
             dbh = SpiderFootDb(self.config)
@@ -602,10 +606,10 @@ class SpiderFootWebUi:
                 self.config = deepcopy(self.defaultConfig)  # Clear in memory
             else:
                 useropts = json.loads(allopts)
-                cleanopts = dict()
-                for opt in list(useropts.keys()):
-                    cleanopts[opt] = self.cleanUserInput([useropts[opt]])[0]
-
+                cleanopts = {
+                    opt: self.cleanUserInput([useropts[opt]])[0]
+                    for opt in list(useropts.keys())
+                }
                 currentopts = deepcopy(self.config)
 
                 # Make a new config where the user options override
@@ -614,7 +618,7 @@ class SpiderFootWebUi:
                 self.config = sf.configUnserialize(cleanopts, currentopts)
                 dbh.configSet(sf.configSerialize(self.config))
         except Exception as e:
-            return self.error("Processing one or more of your inputs failed: " + str(e))
+            return self.error(f"Processing one or more of your inputs failed: {str(e)}")
 
         templ = Template(filename='dyn/opts.tmpl', lookup=self.lookup)
         self.token = random.SystemRandom().randint(0, 99999999)
@@ -626,7 +630,7 @@ class SpiderFootWebUi:
     # Save settings, also used to completely reset them to default
     def savesettingsraw(self, allopts, token):
         if str(token) != str(self.token):
-            return json.dumps(["ERROR", "Invalid token (" + str(self.token) + ")."])
+            return json.dumps(["ERROR", f"Invalid token ({str(self.token)})."])
 
         try:
             dbh = SpiderFootDb(self.config)
@@ -636,10 +640,10 @@ class SpiderFootWebUi:
                 self.config = deepcopy(self.defaultConfig)  # Clear in memory
             else:
                 useropts = json.loads(allopts)
-                cleanopts = dict()
-                for opt in list(useropts.keys()):
-                    cleanopts[opt] = self.cleanUserInput([useropts[opt]])[0]
-
+                cleanopts = {
+                    opt: self.cleanUserInput([useropts[opt]])[0]
+                    for opt in list(useropts.keys())
+                }
                 currentopts = deepcopy(self.config)
 
                 # Make a new config where the user options override
@@ -648,7 +652,12 @@ class SpiderFootWebUi:
                 self.config = sf.configUnserialize(cleanopts, currentopts)
                 dbh.configSet(sf.configSerialize(self.config))
         except Exception as e:
-            return json.dumps(["ERROR", "Processing one or more of your inputs failed: " + str(e)])
+            return json.dumps(
+                [
+                    "ERROR",
+                    f"Processing one or more of your inputs failed: {str(e)}",
+                ]
+            )
 
         return json.dumps(["SUCCESS", ""])
 
@@ -668,7 +677,7 @@ class SpiderFootWebUi:
         status = dbh.scanInstanceGet(id)
         if status[5] not in [ "ABORTED", "FINISHED", "ERROR-FAILED" ]:
             return json.dumps(["WARNING", "Scan must be in a finished state when " + \
-                               "setting False Positives."])
+                                   "setting False Positives."])
 
         # Make sure the user doesn't set something as non-FP when the
         # parent is set as an FP.
@@ -678,17 +687,16 @@ class SpiderFootWebUi:
                 if str(row[14]) == "1":
                     return json.dumps(["WARNING",
                         "You cannot unset an element as False Positive " + \
-                        "if a parent element is still False Positive."]);
+                            "if a parent element is still False Positive."]);
 
         # Set all the children as FPs too.. it's only logical afterall, right?
         childs = dbh.scanElementChildrenAll(id, ids)
         allIds = ids + childs
 
-        ret = dbh.scanResultsUpdateFP(id, allIds, fp)
-        if not ret:
-            return json.dumps(["ERROR", "Exception encountered."])
-        else:
+        if ret := dbh.scanResultsUpdateFP(id, allIds, fp):
             return json.dumps(["SUCCESS", ""])
+        else:
+            return json.dumps(["ERROR", "Exception encountered."])
 
     resultsetfp.exposed = True
 
@@ -696,11 +704,7 @@ class SpiderFootWebUi:
     def eventtypes(self):
         dbh = SpiderFootDb(self.config)
         types = dbh.eventTypes()
-        ret = list()
-
-        for r in types:
-            ret.append([r[1], r[0]])
-
+        ret = [[r[1], r[0]] for r in types]
         ret = sorted(ret, key=itemgetter(0))
 
         return json.dumps(ret)
@@ -709,13 +713,12 @@ class SpiderFootWebUi:
 
     # For the CLI to fetch a list of modules.
     def modules(self):
-        modinfo = list(self.config['__modules__'].keys())
-        modinfo.sort()
-        ret = list()
-        for m in modinfo:
-            if "__" in m:
-                continue
-            ret.append({'name': m, 'descr': self.config['__modules__'][m]['descr']})
+        modinfo = sorted(self.config['__modules__'].keys())
+        ret = [
+            {'name': m, 'descr': self.config['__modules__'][m]['descr']}
+            for m in modinfo
+            if "__" not in m
+        ]
         return json.dumps(ret)
 
     modules.exposed = True
@@ -752,8 +755,8 @@ class SpiderFootWebUi:
 
         # Snapshot the current configuration to be used by the scan
         cfg = deepcopy(self.config)
-        modopts = dict()  # Not used yet as module options are set globally
-        modlist = list()
+        modopts = {}
+        modlist = []
         sf = SpiderFoot(cfg)
         targetType = None
         [scanname, scantarget] = self.cleanUserInput([scanname, scantarget])
@@ -791,7 +794,7 @@ class SpiderFootWebUi:
                             modlist.append(mod)
                             newmods.append(mod)
                 newmodcpy = deepcopy(newmods)
-                newmods = list()
+                newmods = []
 
         # User selected a use case
         if len(modlist) == 0 and usecase != "":
@@ -808,7 +811,7 @@ class SpiderFootWebUi:
         if targetType is None:
             if not cli:
                 return self.error("Invalid target type. Could not recognize it as " + \
-                                  "a human name, IP address, IP subnet, ASN, domain name or host name.")
+                                      "a human name, IP address, IP subnet, ASN, domain name or host name.")
             else:
                 return json.dumps(["ERROR", "Unrecognised target type."])
 
@@ -831,12 +834,11 @@ class SpiderFootWebUi:
             print("[info] Waiting for the scan to initialize...")
             time.sleep(1)
 
-        if not cli:
-            templ = Template(filename='dyn/scaninfo.tmpl', lookup=self.lookup)
-            return templ.render(id=scanId, name=scanname, docroot=self.docroot,
-                                status=globalScanStatus.getStatus(scanId), pageid="SCANLIST")
-        else:
+        if cli:
             return json.dumps(["SUCCESS", scanId])
+        templ = Template(filename='dyn/scaninfo.tmpl', lookup=self.lookup)
+        return templ.render(id=scanId, name=scanname, docroot=self.docroot,
+                            status=globalScanStatus.getStatus(scanId), pageid="SCANLIST")
 
     startscan.exposed = True
 
@@ -846,7 +848,7 @@ class SpiderFootWebUi:
     def stopscanmulti(self, ids):
         global globalScanStatus # running scans
         dbh = SpiderFootDb(self.config)
-        error = list()
+        error = []
 
         for id in ids.split(","):
             errState = False
@@ -858,18 +860,19 @@ class SpiderFootWebUi:
             scanname = str(scaninfo[0])
 
             if globalScanStatus.getStatus(id) == "FINISHED" or scaninfo[5] == "FINISHED":
-                error.append("Scan '" + scanname + "' is in a finished state. <a href='/scandelete?id=" + \
-                             id + "&confirm=1'>Maybe you want to delete it instead?</a>")
+                error.append(
+                    f"Scan '{scanname}' is in a finished state. <a href='/scandelete?id={id}&confirm=1'>Maybe you want to delete it instead?</a>"
+                )
                 errState = True
 
             if not errState and (globalScanStatus.getStatus(id) == "ABORTED" or scaninfo[5] == "ABORTED"):
-                error.append("Scan '" + scanname + "' is already aborted.")
+                error.append(f"Scan '{scanname}' is already aborted.")
                 errState = True
 
             if not errState and globalScanStatus.getStatus(id) is None:
-                error.append("Scan '" + scanname + "' is not actually running. A data consistency " + \
-                             "error for this scan probably exists. <a href='/scandelete?id=" + \
-                             id + "&confirm=1'>Click here to delete it.</a>")
+                error.append(
+                    f"Scan '{scanname}' is not actually running. A data consistency error for this scan probably exists. <a href='/scandelete?id={id}&confirm=1'>Click here to delete it.</a>"
+                )
                 errState = True
 
             if not errState:

@@ -84,14 +84,14 @@ class sfp_abuseipdb(SpiderFootPlugin):
         if len(badregex) > 0:
             for rx in badregex:
                 if re.match(rx, content, re.IGNORECASE | re.DOTALL):
-                    self.sf.debug("Found to be bad against bad regex: " + rx)
+                    self.sf.debug(f"Found to be bad against bad regex: {rx}")
                     return True
 
         # Finally, check for good indicators
         if len(goodregex) > 0:
             for rx in goodregex:
                 if re.match(rx, content, re.IGNORECASE | re.DOTALL):
-                    self.sf.debug("Found to be good againt good regex: " + rx)
+                    self.sf.debug(f"Found to be good againt good regex: {rx}")
                     return False
 
         # If nothing was matched, reply None
@@ -102,7 +102,7 @@ class sfp_abuseipdb(SpiderFootPlugin):
     def resourceQuery(self, id, target, targetType):
         apikey = self.opts['api_key']
         daysback = self.opts['daysback']
-        self.sf.debug("Querying " + id + " for maliciousness of " + target)
+        self.sf.debug(f"Querying {id} for maliciousness of {target}")
         for check in list(malchecks.keys()):
             cid = malchecks[check]['id']
             if id == cid and malchecks[check]['type'] == "query":
@@ -121,10 +121,10 @@ class sfp_abuseipdb(SpiderFootPlugin):
                     if len(j) == 0:
                         return None
                 except BaseException as e:
-                    self.sf.error("Malformatted JSON response: " + str(e), False)
+                    self.sf.error(f"Malformatted JSON response: {str(e)}", False)
                     return None
 
-                return "https://www.abuseipdb.com/check/" + target
+                return f"https://www.abuseipdb.com/check/{target}"
 
         return None
 
@@ -132,8 +132,7 @@ class sfp_abuseipdb(SpiderFootPlugin):
         for check in list(malchecks.keys()):
             cid = malchecks[check]['id']
             if cid == resourceId and itemType in malchecks[check]['checks']:
-                self.sf.debug("Checking maliciousness of " + target + " (" +
-                              itemType + ") with: " + cid)
+                self.sf.debug(f"Checking maliciousness of {target} ({itemType}) with: {cid}")
                 if malchecks[check]['type'] == "query":
                     return self.resourceQuery(cid, target, itemType)
         return None
@@ -144,16 +143,16 @@ class sfp_abuseipdb(SpiderFootPlugin):
         srcModuleName = event.module
         eventData = event.data
 
-        self.sf.debug("Received event, " + eventName + ", from " + srcModuleName)
+        self.sf.debug(f"Received event, {eventName}, from {srcModuleName}")
 
         if eventData in self.results:
-            self.sf.debug("Skipping " + eventData + ", already checked.")
+            self.sf.debug(f"Skipping {eventData}, already checked.")
             return None
         else:
             self.results[eventData] = True
 
         if eventName == 'AFFILIATE_IPADDR' \
-                and not self.opts.get('checkaffiliates', False):
+                    and not self.opts.get('checkaffiliates', False):
             return None
         if eventName == 'NETBLOCK_OWNER' and not self.opts.get('checknetblocks', False):
             return None
@@ -162,27 +161,27 @@ class sfp_abuseipdb(SpiderFootPlugin):
 
         for check in list(malchecks.keys()):
             cid = malchecks[check]['id']
-            if eventName in ['IP_ADDRESS', 'AFFILIATE_IPADDR']:
+            if eventName == 'AFFILIATE_IPADDR':
                 typeId = 'ip'
-                if eventName == 'IP_ADDRESS':
-                    evtType = 'MALICIOUS_IPADDR'
-                else:
-                    evtType = 'MALICIOUS_AFFILIATE_IPADDR'
+                evtType = 'MALICIOUS_AFFILIATE_IPADDR'
 
-            if eventName == 'NETBLOCK_OWNER':
-                typeId = 'netblock'
-                evtType = 'MALICIOUS_NETBLOCK'
-            if eventName == 'NETBLOCK_MEMBER':
+            elif eventName == 'IP_ADDRESS':
+                typeId = 'ip'
+                evtType = 'MALICIOUS_IPADDR'
+            elif eventName == 'NETBLOCK_MEMBER':
                 typeId = 'netblock'
                 evtType = 'MALICIOUS_SUBNET'
 
+            elif eventName == 'NETBLOCK_OWNER':
+                typeId = 'netblock'
+                evtType = 'MALICIOUS_NETBLOCK'
             url = self.lookupItem(cid, typeId, eventData)
             if self.checkForStop():
                 return None
 
             # Notify other modules of what you've found
             if url is not None:
-                text = check + " [" + eventData + "]\n" + "<SFURL>" + url + "</SFURL>"
+                text = f"{check} [{eventData}" + "]\n" + "<SFURL>" + url + "</SFURL>"
                 evt = SpiderFootEvent(evtType, text, self.__name__, event)
                 self.notifyListeners(evt)
 

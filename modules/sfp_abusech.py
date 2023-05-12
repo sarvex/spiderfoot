@@ -129,14 +129,14 @@ class sfp_abusech(SpiderFootPlugin):
         if len(badregex) > 0:
             for rx in badregex:
                 if re.match(rx, content, re.IGNORECASE | re.DOTALL):
-                    self.sf.debug("Found to be bad against bad regex: " + rx)
+                    self.sf.debug(f"Found to be bad against bad regex: {rx}")
                     return True
 
         # Finally, check for good indicators
         if len(goodregex) > 0:
             for rx in goodregex:
                 if re.match(rx, content, re.IGNORECASE | re.DOTALL):
-                    self.sf.debug("Found to be good againt good regex: " + rx)
+                    self.sf.debug(f"Found to be good againt good regex: {rx}")
                     return False
 
         # If nothing was matched, reply None
@@ -145,14 +145,14 @@ class sfp_abusech(SpiderFootPlugin):
 
     # Look up 'query' type sources
     def resourceQuery(self, id, target, targetType):
-        self.sf.debug("Querying " + id + " for maliciousness of " + target)
+        self.sf.debug(f"Querying {id} for maliciousness of {target}")
         for check in list(malchecks.keys()):
             cid = malchecks[check]['id']
             if id == cid and malchecks[check]['type'] == "query":
                 url = str(malchecks[check]['url'])
                 res = self.sf.fetchUrl(url.format(target), timeout=self.opts['_fetchtimeout'], useragent=self.opts['_useragent'])
                 if res['content'] is None:
-                    self.sf.error("Unable to fetch " + url.format(target), False)
+                    self.sf.error(f"Unable to fetch {url.format(target)}", False)
                     return None
                 if self.contentMalicious(res['content'],
                                          malchecks[check]['goodregex'],
@@ -171,20 +171,23 @@ class sfp_abusech(SpiderFootPlugin):
         for check in list(malchecks.keys()):
             cid = malchecks[check]['id']
             if id == cid and malchecks[check]['type'] == "list":
-                data = dict()
                 url = malchecks[check]['url']
-                data['content'] = self.sf.cacheGet("sfmal_" + cid, self.opts.get('cacheperiod', 0))
+                data = {
+                    'content': self.sf.cacheGet(
+                        f"sfmal_{cid}", self.opts.get('cacheperiod', 0)
+                    )
+                }
                 if data['content'] is None:
                     data = self.sf.fetchUrl(url, timeout=self.opts['_fetchtimeout'], useragent=self.opts['_useragent'])
                     if data['content'] is None:
-                        self.sf.error("Unable to fetch " + url, False)
+                        self.sf.error(f"Unable to fetch {url}", False)
                         return None
                     else:
-                        self.sf.cachePut("sfmal_" + cid, data['content'])
+                        self.sf.cachePut(f"sfmal_{cid}", data['content'])
 
                 # If we're looking at netblocks
                 if targetType == "netblock":
-                    iplist = list()
+                    iplist = []
                     # Get the regex, replace {0} with an IP address matcher to
                     # build a list of IP.
                     # Cycle through each IP and check if it's in the netblock.
@@ -192,7 +195,7 @@ class sfp_abusech(SpiderFootPlugin):
                         rx = malchecks[check]['regex'].replace("{0}",
                                                                "(\d+\.\d+\.\d+\.\d+)")
                         pat = re.compile(rx, re.IGNORECASE)
-                        self.sf.debug("New regex for " + check + ": " + rx)
+                        self.sf.debug(f"New regex for {check}: {rx}")
                         for line in data['content'].split('\n'):
                             grp = re.findall(pat, line)
                             if len(grp) > 0:
@@ -208,11 +211,10 @@ class sfp_abusech(SpiderFootPlugin):
 
                         try:
                             if IPAddress(ip) in IPNetwork(target):
-                                self.sf.debug(ip + " found within netblock/subnet " +
-                                              target + " in " + check)
+                                self.sf.debug(f"{ip} found within netblock/subnet {target} in {check}")
                                 return url
                         except Exception as e:
-                            self.sf.debug("Error encountered parsing: " + str(e))
+                            self.sf.debug(f"Error encountered parsing: {str(e)}")
                             continue
 
                     return None
@@ -221,7 +223,7 @@ class sfp_abusech(SpiderFootPlugin):
                 if 'regex' not in malchecks[check]:
                     for line in data['content'].split('\n'):
                         if line == target or (targetType == "domain" and line == targetDom):
-                            self.sf.debug(target + "/" + targetDom + " found in " + check + " list.")
+                            self.sf.debug(f"{target}/{targetDom} found in {check} list.")
                             return url
                 else:
                     try:
@@ -230,11 +232,11 @@ class sfp_abusech(SpiderFootPlugin):
                         rxTgt = str(malchecks[check]['regex']).format(target)
                         for line in data['content'].split('\n'):
                             if (targetType == "domain" and re.match(rxDom, line, re.IGNORECASE)) or \
-                                    re.match(rxTgt, line, re.IGNORECASE):
-                                self.sf.debug(target + "/" + targetDom + " found in " + check + " list.")
+                                        re.match(rxTgt, line, re.IGNORECASE):
+                                self.sf.debug(f"{target}/{targetDom} found in {check} list.")
                                 return url
                     except BaseException as e:
-                        self.sf.debug("Error encountered parsing 2: " + str(e))
+                        self.sf.debug(f"Error encountered parsing 2: {str(e)}")
                         continue
 
         return None
@@ -243,8 +245,7 @@ class sfp_abusech(SpiderFootPlugin):
         for check in list(malchecks.keys()):
             cid = malchecks[check]['id']
             if cid == resourceId and itemType in malchecks[check]['checks']:
-                self.sf.debug("Checking maliciousness of " + target + " (" +
-                              itemType + ") with: " + cid)
+                self.sf.debug(f"Checking maliciousness of {target} ({itemType}) with: {cid}")
                 if malchecks[check]['type'] == "query":
                     return self.resourceQuery(cid, target, itemType)
                 if malchecks[check]['type'] == "list":
@@ -258,10 +259,10 @@ class sfp_abusech(SpiderFootPlugin):
         srcModuleName = event.module
         eventData = event.data
 
-        self.sf.debug("Received event, " + eventName + ", from " + srcModuleName)
+        self.sf.debug(f"Received event, {eventName}, from {srcModuleName}")
 
         if eventData in self.results:
-            self.sf.debug("Skipping " + eventData + ", already checked.")
+            self.sf.debug(f"Skipping {eventData}, already checked.")
             return None
         else:
             self.results[eventData] = True
@@ -269,7 +270,7 @@ class sfp_abusech(SpiderFootPlugin):
         if eventName == 'CO_HOSTED_SITE' and not self.opts.get('checkcohosts', False):
             return None
         if eventName == 'AFFILIATE_IPADDR' \
-                and not self.opts.get('checkaffiliates', False):
+                    and not self.opts.get('checkaffiliates', False):
             return None
         if eventName == 'NETBLOCK_OWNER' and not self.opts.get('checknetblocks', False):
             return None
@@ -280,13 +281,13 @@ class sfp_abusech(SpiderFootPlugin):
             cid = malchecks[check]['id']
             # If the module is enabled..
             if self.opts[cid]:
-                if eventName in ['IP_ADDRESS', 'AFFILIATE_IPADDR']:
+                if eventName == 'AFFILIATE_IPADDR':
                     typeId = 'ip'
-                    if eventName == 'IP_ADDRESS':
-                        evtType = 'MALICIOUS_IPADDR'
-                    else:
-                        evtType = 'MALICIOUS_AFFILIATE_IPADDR'
+                    evtType = 'MALICIOUS_AFFILIATE_IPADDR'
 
+                elif eventName == 'IP_ADDRESS':
+                    typeId = 'ip'
+                    evtType = 'MALICIOUS_IPADDR'
                 if eventName in ['BGP_AS_OWNER', 'BGP_AS_MEMBER']:
                     typeId = 'asn'
                     evtType = 'MALICIOUS_ASN'
@@ -294,27 +295,27 @@ class sfp_abusech(SpiderFootPlugin):
                 if eventName in ['INTERNET_NAME', 'CO_HOSTED_SITE',
                                  'AFFILIATE_INTERNET_NAME', ]:
                     typeId = 'domain'
-                    if eventName == "INTERNET_NAME":
-                        evtType = "MALICIOUS_INTERNET_NAME"
                     if eventName == 'AFFILIATE_INTERNET_NAME':
                         evtType = 'MALICIOUS_AFFILIATE_INTERNET_NAME'
-                    if eventName == 'CO_HOSTED_SITE':
+                    elif eventName == 'CO_HOSTED_SITE':
                         evtType = 'MALICIOUS_COHOST'
 
-                if eventName == 'NETBLOCK_OWNER':
-                    typeId = 'netblock'
-                    evtType = 'MALICIOUS_NETBLOCK'
+                    elif eventName == "INTERNET_NAME":
+                        evtType = "MALICIOUS_INTERNET_NAME"
                 if eventName == 'NETBLOCK_MEMBER':
                     typeId = 'netblock'
                     evtType = 'MALICIOUS_SUBNET'
 
+                elif eventName == 'NETBLOCK_OWNER':
+                    typeId = 'netblock'
+                    evtType = 'MALICIOUS_NETBLOCK'
                 url = self.lookupItem(cid, typeId, eventData)
                 if self.checkForStop():
                     return None
 
                 # Notify other modules of what you've found
                 if url is not None:
-                    text = check + " [" + eventData + "]\n" + "<SFURL>" + url + "</SFURL>"
+                    text = f"{check} [{eventData}" + "]\n" + "<SFURL>" + url + "</SFURL>"
                     evt = SpiderFootEvent(evtType, text, self.__name__, event)
                     self.notifyListeners(evt)
 

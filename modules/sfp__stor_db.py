@@ -46,13 +46,15 @@ class sfp__stor_db(SpiderFootPlugin):
         if not self.opts['_store']:
             return None
 
-        if self.opts['maxstorage'] != 0:
-            if len(sfEvent.data) > self.opts['maxstorage']:
-                self.sf.debug("Storing an event: " + sfEvent.eventType)
-                self.__sfdb__.scanEventStore(self.getScanId(), sfEvent, self.opts['maxstorage'])
-                return None
+        if (
+            self.opts['maxstorage'] != 0
+            and len(sfEvent.data) > self.opts['maxstorage']
+        ):
+            self.sf.debug(f"Storing an event: {sfEvent.eventType}")
+            self.__sfdb__.scanEventStore(self.getScanId(), sfEvent, self.opts['maxstorage'])
+            return None
 
-        self.sf.debug("Storing an event: " + sfEvent.eventType)
+        self.sf.debug(f"Storing an event: {sfEvent.eventType}")
         self.__sfdb__.scanEventStore(self.getScanId(), sfEvent)
 
 

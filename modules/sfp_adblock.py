@@ -56,7 +56,7 @@ class sfp_adblock(SpiderFootPlugin):
         srcModuleName = event.module
         eventData = event.data
 
-        self.sf.debug("Received event, " + eventName + ", from " + srcModuleName)
+        self.sf.debug(f"Received event, {eventName}, from {srcModuleName}")
 
         if self.errorState:
             return None
@@ -65,21 +65,17 @@ class sfp_adblock(SpiderFootPlugin):
             raw = self.sf.fetchUrl(self.opts['blocklist'], timeout=30)
             if raw['content'] is not None:
                 lines = raw['content'].split('\n')
-                self.sf.debug("RULE LINES: " + str(len(lines)))
+                self.sf.debug(f"RULE LINES: {len(lines)}")
                 try:
                     self.rules = adblockparser.AdblockRules(lines)
                 except BaseException as e:
                     self.errorState = True
-                    self.sf.error("Parsing error handling AdBlock list: " + str(e), False)
+                    self.sf.error(f"Parsing error handling AdBlock list: {str(e)}", False)
             else:
                 self.errorState = True
                 self.sf.error("Unable to download AdBlockPlus list: " + self.opts['blocklist'], False)
 
-        if "_EXTERNAL" in eventName:
-            pagetype = "_EXTERNAL"
-        else:
-            pagetype = "_INTERNAL"
-
+        pagetype = "_EXTERNAL" if "_EXTERNAL" in eventName else "_INTERNAL"
         if eventData not in self.results:
             self.results[eventData] = True
         else:
@@ -88,11 +84,12 @@ class sfp_adblock(SpiderFootPlugin):
 
         try:
             if self.rules and self.rules.should_block(eventData):
-                evt = SpiderFootEvent("URL_ADBLOCKED" + pagetype, eventData,
-                                      self.__name__, event)
+                evt = SpiderFootEvent(
+                    f"URL_ADBLOCKED{pagetype}", eventData, self.__name__, event
+                )
                 self.notifyListeners(evt)
         except BaseException as e:
-            self.sf.error("Parsing error handling AdBlock list: " + str(e), False)
+            self.sf.error(f"Parsing error handling AdBlock list: {str(e)}", False)
             self.errorState = True
 
         return None
